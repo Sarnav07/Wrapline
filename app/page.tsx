@@ -3,6 +3,7 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId } from "wagmi";
 import { SUPPORTED_NETWORKS } from "@/lib/wagmi";
+import { RegistryTable } from "@/components/RegistryTable";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -25,7 +26,7 @@ export default function Home() {
         <ConnectButton showBalance={false} chainStatus="full" />
       </header>
 
-      <section className="flex-1 mx-auto w-full max-w-3xl px-6 py-16 sm:py-24">
+      <section className="flex-1 mx-auto w-full max-w-5xl px-6 py-12 sm:py-16">
         <p className="text-[#FFC83D] text-sm font-semibold tracking-[0.18em] uppercase">
           Zama Developer Program
         </p>
@@ -77,6 +78,10 @@ export default function Home() {
               Switch to Sepolia or Ethereum mainnet using the network selector above.
             </p>
           )}
+        </div>
+
+        <div className="mt-8">
+          <RegistryTable />
         </div>
       </section>
     </main>
