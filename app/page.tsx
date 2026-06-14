@@ -5,6 +5,7 @@ import { useAccount, useChainId } from "wagmi";
 import { SUPPORTED_NETWORKS } from "@/lib/wagmi";
 import { RegistryTable } from "@/components/RegistryTable";
 import { WrapCard } from "@/components/WrapCard";
+import { UnwrapCard } from "@/components/UnwrapCard";
 import { DecryptCard } from "@/components/DecryptCard";
 
 export default function Home() {
@@ -86,6 +87,7 @@ export default function Home() {
           <RegistryTable />
           <div className="space-y-6">
             <WrapCard />
+            <UnwrapCard />
             <DecryptCard />
           </div>
         </div>
