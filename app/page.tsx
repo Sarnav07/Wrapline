@@ -4,6 +4,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId } from "wagmi";
 import { SUPPORTED_NETWORKS } from "@/lib/wagmi";
 import { RegistryTable } from "@/components/RegistryTable";
+import { WrapCard } from "@/components/WrapCard";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -80,8 +81,9 @@ export default function Home() {
           )}
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
           <RegistryTable />
+          <WrapCard />
         </div>
       </section>
     </main>
