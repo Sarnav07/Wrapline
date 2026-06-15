@@ -8,7 +8,7 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { mainnet, sepolia } from "wagmi/chains";
 import { formatUnits, parseUnits, zeroAddress } from "viem";
 import {
   useApproveUnderlying,
@@ -18,10 +18,13 @@ import {
 } from "@zama-fhe/react-sdk";
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
 import { erc20MintableAbi, FAUCET_AMOUNT } from "@/lib/erc20";
+import { humanizeError } from "@/lib/errors";
+import { useConfirm } from "./ConfirmModal";
+import { NetworkBanner } from "./NetworkBanner";
 
 function StatusLine({ label, pending, error }: { label: string; pending: boolean; error?: Error | null }) {
   if (pending) return <p className="mt-2 text-xs text-[#FFC83D]">{label}…</p>;
-  if (error) return <p className="mt-2 text-xs text-rose-300">{error.message}</p>;
+  if (error) return <p className="mt-2 text-xs text-rose-300">{humanizeError(error)}</p>;
   return null;
 }
 
@@ -29,6 +32,8 @@ function WrapInner() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const isSepolia = chainId === sepolia.id;
+  const isMainnet = chainId === mainnet.id;
+  const { confirm, modal } = useConfirm();
 
   const { rows } = useRegistryPairs();
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
@@ -111,12 +116,34 @@ function WrapInner() {
   }
 
   const needsApproval = allowance.data !== undefined && amountBig > 0n && allowance.data < amountBig;
-  const canWrap = amountBig > 0n && !needsApproval;
+  const insufficient = balance.data !== undefined && amountBig > 0n && (balance.data as bigint) < amountBig;
+  const canWrap = amountBig > 0n && !needsApproval && !insufficient;
   const balanceFmt = balance.data !== undefined ? formatUnits(balance.data as bigint, decimals) : "—";
+
+  // Mainnet writes move real funds — gate them behind an explicit confirm.
+  async function doWrap() {
+    if (isMainnet) {
+      const ok = await confirm({
+        title: "Wrap on Ethereum mainnet?",
+        tone: "danger",
+        confirmLabel: "Wrap real funds",
+        body: (
+          <>
+            You&apos;re about to wrap <span className="font-semibold text-[#EAF0FA]">{amount} {pair!.underlying.symbol}</span>{" "}
+            of real funds on Ethereum mainnet. Start with a tiny amount to test the flow.
+          </>
+        ),
+      });
+      if (!ok) return;
+    }
+    shield.mutate({ amount: amountBig });
+  }
 
   return (
     <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
       <h2 className="font-semibold">Faucet &amp; Wrap</h2>
+      <NetworkBanner />
+      {modal}
 
       {/* Pair selector */}
       <label className="mt-4 block text-xs uppercase tracking-wider text-[#7A8699]">Pair</label>
@@ -174,6 +201,27 @@ function WrapInner() {
         Wrapped 1:1 into {pair.confidential.symbol} at the on-chain rate; fractions below the wrapper&apos;s
         precision aren&apos;t minted.
       </p>
+      {isMainnet && (
+        <div className="mt-2 flex items-center gap-2">
+          <span className="text-xs text-[#7A8699]">Tiny test amounts:</span>
+          {["0.001", "0.01"].map((v) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setAmount(v)}
+              className="rounded-md bg-white/5 px-2 py-0.5 text-xs text-[#94A2B8] ring-1 ring-white/10 hover:bg-white/10"
+            >
+              {v}
+            </button>
+          ))}
+        </div>
+      )}
+      {insufficient && (
+        <p className="mt-2 text-xs text-rose-300">
+          Insufficient {pair.underlying.symbol} balance — you have {balanceFmt}.
+          {isSepolia ? " Use the faucet above." : ""}
+        </p>
+      )}
 
       {needsApproval ? (
         <button
@@ -188,7 +236,7 @@ function WrapInner() {
         <button
           type="button"
           disabled={!canWrap || shield.isPending}
-          onClick={() => shield.mutate({ amount: amountBig })}
+          onClick={doWrap}
           className="mt-3 w-full rounded-lg bg-[#FFC83D] px-3 py-2 text-sm font-semibold text-[#0B0E14] hover:brightness-95 disabled:opacity-50"
         >
           {shield.isPending ? "Wrapping…" : "Wrap"}

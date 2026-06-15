@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount, useChainId } from "wagmi";
+import { mainnet } from "wagmi/chains";
 import { parseUnits, zeroAddress, type Address, type Hex } from "viem";
 import {
   useUnshield,
@@ -12,6 +13,9 @@ import {
   clearPendingUnshield,
 } from "@zama-fhe/react-sdk";
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
+import { humanizeError } from "@/lib/errors";
+import { useConfirm } from "./ConfirmModal";
+import { NetworkBanner } from "./NetworkBanner";
 
 const storage = indexedDBStorage;
 
@@ -90,7 +94,7 @@ function ResumeEntry({
         </span>{" "}
         was submitted but not finalized.
       </p>
-      {resume.isError && <p className="mt-1 text-xs text-rose-300">{resume.error?.message}</p>}
+      {resume.isError && <p className="mt-1 text-xs text-rose-300">{humanizeError(resume.error)}</p>}
       <div className="mt-2 flex gap-2">
         <button
           type="button"
@@ -125,6 +129,9 @@ function ResumeEntry({
 
 function UnwrapInner() {
   const { isConnected } = useAccount();
+  const chainId = useChainId();
+  const isMainnet = chainId === mainnet.id;
+  const { confirm, modal } = useConfirm();
   const { rows } = useRegistryPairs();
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
@@ -183,8 +190,22 @@ function UnwrapInner() {
   const wrapper = pair?.confidentialTokenAddress;
   const canUnwrap = Boolean(pair) && amountBig > 0n && stage !== "unwrapping" && stage !== "finalizing" && stage !== "submitted";
 
-  function runUnwrap() {
+  async function runUnwrap() {
     if (!wrapper) return;
+    if (isMainnet) {
+      const ok = await confirm({
+        title: "Unwrap on Ethereum mainnet?",
+        tone: "danger",
+        confirmLabel: "Unwrap real funds",
+        body: (
+          <>
+            You&apos;re about to unwrap <span className="font-semibold text-[#EAF0FA]">{amount} {pair!.confidential.symbol}</span>{" "}
+            back to ERC-20 on Ethereum mainnet. This moves real funds.
+          </>
+        ),
+      });
+      if (!ok) return;
+    }
     setStage("unwrapping");
     unshield.mutate(
       {
@@ -217,6 +238,8 @@ function UnwrapInner() {
         ERC-7984 → ERC-20. Async: the unwrap is requested on-chain, the KMS publicly decrypts the amount, then
         the wrapper finalizes. Decrypt your balance in the panel above to see what you can unwrap.
       </p>
+      <NetworkBanner />
+      {modal}
 
       {pending.length > 0 && (
         <div className="mt-4 space-y-2">
@@ -252,6 +275,21 @@ function UnwrapInner() {
             onChange={(e) => setAmount(e.target.value)}
             className="mt-1 w-full rounded-lg border border-white/10 bg-[#070A12] px-3 py-2 text-sm tabular-nums"
           />
+          {isMainnet && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-[#7A8699]">Tiny test amounts:</span>
+              {["0.001", "0.01"].map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setAmount(v)}
+                  className="rounded-md bg-white/5 px-2 py-0.5 text-xs text-[#94A2B8] ring-1 ring-white/10 hover:bg-white/10"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          )}
 
           <button
             type="button"
@@ -271,7 +309,7 @@ function UnwrapInner() {
           )}
           {stage === "error" && (
             <p className="mt-3 rounded-lg bg-rose-400/10 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-400/30">
-              {unshield.error?.message ?? "Unwrap failed."} If the unwrap tx already landed, use Resume above.
+              {humanizeError(unshield.error, "Unwrap failed.")} If the unwrap tx already landed, use Resume above.
             </p>
           )}
         </>

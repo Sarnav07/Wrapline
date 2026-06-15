@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { erc20Abi, formatUnits, isAddress, numberToHex, type Address } from "viem";
 import { useConfidentialBalance, useIsConfidential, useUserDecrypt } from "@zama-fhe/react-sdk";
-import { useRegistryPairs } from "@/lib/registry";
+import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
+import { humanizeError } from "@/lib/errors";
+import { NetworkBanner } from "./NetworkBanner";
 
 function formatClear(value: bigint | boolean | `0x${string}`, decimals: number) {
   if (typeof value === "bigint") return formatUnits(value, decimals);
@@ -81,7 +83,7 @@ function DecryptRow({
         ) : !revealed ? (
           <span className="font-mono tracking-widest text-[#7A8699]">••••••••</span>
         ) : decrypt.isError ? (
-          <span className="text-rose-300">{decrypt.error?.message ?? "Decryption failed"}</span>
+          <span className="text-rose-300">{humanizeError(decrypt.error, "Decryption failed")}</span>
         ) : cleartext !== undefined ? (
           <span className="tabular-nums text-emerald-300">
             {formatClear(cleartext, decimals)} {symbol ?? ""}
@@ -124,6 +126,72 @@ function PasteDecrypt() {
   );
 }
 
+/**
+ * Probes one registry token for a non-zero confidential balance. Renders a
+ * decrypt row only when the wallet actually holds the token, so the auto-detect
+ * list surfaces just the tokens worth revealing. Reads share react-query's cache
+ * with the rows below, so this adds no extra RPC traffic.
+ */
+function DetectRow({ row }: { row: RegistryRow }) {
+  const { address } = useAccount();
+  const balance = useConfidentialBalance({ tokenAddress: row.confidentialTokenAddress }, { enabled: Boolean(address) });
+
+  if (balance.isLoading) {
+    return <div className="h-12 animate-pulse rounded-lg bg-white/5" />;
+  }
+  if (balance.data === undefined || balance.data === 0n) return null;
+
+  return (
+    <DecryptRow
+      tokenAddress={row.confidentialTokenAddress}
+      symbol={row.confidential.symbol}
+      knownDecimals={row.confidential.decimals}
+    />
+  );
+}
+
+/**
+ * Best-effort auto-detect: scan every registry token for a balance the wallet
+ * holds, surfacing them as ready-to-reveal rows. Anything outside the registry
+ * is covered by the paste-an-address fallback below. Gated behind a button so we
+ * don't fan out balance reads until the user asks.
+ */
+function AutoDetect({ rows }: { rows: RegistryRow[] }) {
+  const [scanning, setScanning] = useState(false);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <label className="block text-xs uppercase tracking-wider text-[#7A8699]">Your tokens</label>
+        <button
+          type="button"
+          onClick={() => setScanning((s) => !s)}
+          className="rounded-md bg-white/5 px-3 py-1 text-xs text-[#94A2B8] ring-1 ring-white/10 hover:bg-white/10"
+        >
+          {scanning ? "Hide" : "Scan my balances"}
+        </button>
+      </div>
+      {scanning && (
+        <div className="mt-3 space-y-2">
+          {rows.length === 0 ? (
+            <p className="text-xs text-[#7A8699]">No registry tokens on this network.</p>
+          ) : (
+            <>
+              {rows.map((r) => (
+                <DetectRow key={r.confidentialTokenAddress} row={r} />
+              ))}
+              <p className="text-xs text-[#7A8699]">
+                Only tokens with a non-zero balance appear here. Holdings outside the registry? Paste the
+                address below.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DecryptInner() {
   const { isConnected } = useAccount();
   const { rows } = useRegistryPairs();
@@ -150,6 +218,11 @@ function DecryptInner() {
         Reveal your own ERC-7984 balance via EIP-712. The first reveal asks for one signature, then reuses the
         session.
       </p>
+      <NetworkBanner />
+
+      <div className="mt-4">
+        <AutoDetect rows={rows} />
+      </div>
 
       {/* Registry token */}
       {pair && (

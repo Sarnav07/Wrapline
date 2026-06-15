@@ -7,6 +7,7 @@ import { RegistryTable } from "@/components/RegistryTable";
 import { WrapCard } from "@/components/WrapCard";
 import { UnwrapCard } from "@/components/UnwrapCard";
 import { DecryptCard } from "@/components/DecryptCard";
+import { NetworkBanner } from "@/components/NetworkBanner";
 
 export default function Home() {
   const { address, isConnected } = useAccount();
@@ -76,11 +77,7 @@ export default function Home() {
             </div>
           </dl>
 
-          {isConnected && !supported && (
-            <p className="mt-4 text-xs text-amber-300/90">
-              Switch to Sepolia or Ethereum mainnet using the network selector above.
-            </p>
-          )}
+          <NetworkBanner />
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
