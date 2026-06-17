@@ -3,18 +3,83 @@
 @tailwind utilities;
 
 :root {
-  --background: #070a12;
-  --foreground: #eaf0fa;
+  /* Fluxo brand palette (faithful) */
+  --accent-blue: #006be4; /* Deep Flow Blue */
+  --accent-blue-foreground: #ffffff;
+  --accent-sky: #b5d6ff; /* Sky Circuit */
+  --bg-dark: #000000; /* Core Black */
+  --bg-dark-soft: #070a12; /* near-black, dApp continuity */
+  --bg-light: #ffffff;
+  --surface-gray: #ececec; /* Light Gray */
+  --text-muted: #6b6b6b; /* Dark Gray (on light) */
+  --foreground: #eaf0fa; /* on-dark text */
+  --foreground-dark: #0b0e14; /* on-light / on-blue text */
+  --gradient-brand: linear-gradient(
+    135deg,
+    #003168 0%,
+    #006be4 35%,
+    #6173ff 60%,
+    #b5d6ff 82%,
+    #ffffff 100%
+  );
+
+  /* backward-compat (un-migrated inline usages) */
+  --background: var(--bg-dark-soft);
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--bg-dark-soft);
+  font-family: var(--font-satoshi), var(--font-geist-sans), system-ui,
+    "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .bg-gradient-brand {
+    background-image: var(--gradient-brand);
+  }
+  /* The signature "type-rain": low-contrast word cascade. */
+  .type-rain {
+    font-family: var(--font-satoshi), sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.42em;
+    user-select: none;
+    pointer-events: none;
+  }
+}
+
+/* Type-rain motion: a slow seamless vertical drift of the word column
+ * (column is rendered as two identical halves, so -50% loops cleanly),
+ * plus a gentle per-letter bob for the scattered field. */
+@keyframes type-cascade {
+  0% {
+    transform: translateY(-50%);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes type-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+/* Honor reduced-motion: neutralize all the marketing motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

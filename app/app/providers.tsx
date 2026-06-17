@@ -19,8 +19,8 @@ import { ViemSigner } from "@zama-fhe/sdk/viem";
 import { wagmiConfig, SEPOLIA_RPC, MAINNET_RPC } from "@/lib/wagmi";
 
 const rkTheme = darkTheme({
-  accentColor: "#FFC83D",
-  accentColorForeground: "#0B0E14",
+  accentColor: "#006BE4",
+  accentColorForeground: "#FFFFFF",
   borderRadius: "large",
   overlayBlur: "small",
 });

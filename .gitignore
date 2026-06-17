@@ -41,3 +41,5 @@ tsconfig.tsbuildinfo
 # bounty: internal planning + brand assets, not part of the shipped app
 /docs/
 /brand/
+/design/
+/frontend-track.md

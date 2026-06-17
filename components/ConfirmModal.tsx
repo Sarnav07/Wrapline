@@ -58,8 +58,8 @@ export function useConfirm() {
           <button
             type="button"
             onClick={() => close(true)}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-[#0B0E14] hover:brightness-95 ${
-              pending.tone === "danger" ? "bg-rose-400" : "bg-[#FFC83D]"
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-accent-blue-foreground hover:brightness-95 ${
+              pending.tone === "danger" ? "bg-rose-400" : "bg-accent-blue"
             }`}
           >
             {pending.confirmLabel ?? "Confirm"}

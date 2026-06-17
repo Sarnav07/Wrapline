@@ -28,7 +28,7 @@ export function NetworkBanner() {
           type="button"
           disabled={isPending}
           onClick={() => switchChain({ chainId: sepolia.id })}
-          className="rounded-md bg-[#FFC83D] px-3 py-1.5 text-xs font-semibold text-[#0B0E14] hover:brightness-95 disabled:opacity-50"
+          className="rounded-md bg-accent-blue px-3 py-1.5 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
         >
           {isPending ? "Switching…" : "Switch to Sepolia"}
         </button>

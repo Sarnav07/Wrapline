@@ -70,7 +70,7 @@ function DecryptRow({
             type="button"
             disabled={balance.data === undefined || (revealed && decrypt.isFetching)}
             onClick={() => setRevealed(true)}
-            className="rounded-md bg-[#FFC83D] px-3 py-1.5 text-xs font-semibold text-[#0B0E14] hover:brightness-95 disabled:opacity-50"
+            className="rounded-md bg-accent-blue px-3 py-1.5 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
           >
             {revealed && decrypt.isFetching ? "Decrypting…" : "Reveal"}
           </button>

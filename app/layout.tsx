@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { Providers } from "./providers";
 
+const satoshi = localFont({
+  src: "./fonts/Satoshi-Variable.woff2",
+  variable: "--font-satoshi",
+  weight: "300 900",
+  display: "swap",
+});
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
   variable: "--font-geist-sans",
@@ -15,9 +20,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Wrapline — Confidential Wrapper Registry",
+  title: "Wrapline — Confidential wrapping, without the friction",
   description:
-    "Browse, wrap, unwrap, and decrypt every official ERC-20 ↔ ERC-7984 pair on Sepolia and Ethereum mainnet. Powered by the Zama Protocol.",
+    "Wrap any ERC-20 into a confidential ERC-7984 token, move shielded balances on-chain, and reveal them only when you choose — powered by Zama's FHE protocol.",
 };
 
 export default function RootLayout({
@@ -25,8 +30,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <Providers>{children}</Providers>
+      <body
+        className={`${satoshi.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {children}
       </body>
     </html>
   );

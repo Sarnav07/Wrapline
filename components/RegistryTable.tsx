@@ -20,7 +20,7 @@ function AddressLink({ address, chainId }: { address: Address; chainId: number }
       href={`${explorerBase(chainId)}/address/${address}`}
       target="_blank"
       rel="noreferrer"
-      className="font-mono text-xs text-[#94A2B8] hover:text-[#FFC83D]"
+      className="font-mono text-xs text-[#94A2B8] hover:text-accent-blue"
     >
       {short(address)}
     </a>
@@ -55,7 +55,7 @@ function PairRow({ row }: { row: RegistryRow }) {
         <span
           className={`rounded-full px-2 py-0.5 text-xs ring-1 ${
             row.source === "custom"
-              ? "bg-[#FFC83D]/10 text-[#FFC83D] ring-[#FFC83D]/30"
+              ? "bg-accent-blue/10 text-accent-blue ring-accent-blue/30"
               : "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30"
           }`}
         >

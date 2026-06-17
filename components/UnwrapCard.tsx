@@ -50,12 +50,12 @@ function Stepper({ stage }: { stage: Stage }) {
           <li key={label} className="flex items-center gap-2 text-xs">
             <span
               className={`grid h-4 w-4 place-items-center rounded-full text-[10px] ${
-                done ? "bg-emerald-400 text-[#0B0E14]" : current ? "bg-[#FFC83D] text-[#0B0E14]" : "bg-white/10 text-[#7A8699]"
+                done ? "bg-emerald-400 text-[#0B0E14]" : current ? "bg-accent-blue text-accent-blue-foreground" : "bg-white/10 text-[#7A8699]"
               }`}
             >
               {done ? "✓" : i + 1}
             </span>
-            <span className={done ? "text-emerald-300" : current ? "text-[#FFC83D]" : "text-[#7A8699]"}>
+            <span className={done ? "text-emerald-300" : current ? "text-accent-blue" : "text-[#7A8699]"}>
               {label}
               {current ? "…" : ""}
             </span>
@@ -110,7 +110,7 @@ function ResumeEntry({
               },
             )
           }
-          className="rounded-md bg-[#FFC83D] px-3 py-1.5 text-xs font-semibold text-[#0B0E14] hover:brightness-95 disabled:opacity-50"
+          className="rounded-md bg-accent-blue px-3 py-1.5 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
         >
           {resume.isPending ? "Finalizing…" : "Resume finalize"}
         </button>
@@ -180,7 +180,7 @@ function UnwrapInner() {
 
   if (!isConnected) {
     return (
-      <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
+      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
         <h2 className="font-semibold">Unwrap</h2>
         <p className="mt-3 text-sm text-[#7A8699]">Connect a wallet to unwrap back to ERC-20.</p>
       </section>
@@ -232,7 +232,7 @@ function UnwrapInner() {
   }
 
   return (
-    <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
+    <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
       <h2 className="font-semibold">Unwrap</h2>
       <p className="mt-1 text-xs text-[#7A8699]">
         ERC-7984 → ERC-20. Async: the unwrap is requested on-chain, the KMS publicly decrypts the amount, then
@@ -295,7 +295,7 @@ function UnwrapInner() {
             type="button"
             disabled={!canUnwrap}
             onClick={runUnwrap}
-            className="mt-3 w-full rounded-lg bg-[#FFC83D] px-3 py-2 text-sm font-semibold text-[#0B0E14] hover:brightness-95 disabled:opacity-50"
+            className="mt-3 w-full rounded-lg bg-accent-blue px-3 py-2 text-sm font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
           >
             {stage === "unwrapping" || stage === "finalizing" || stage === "submitted" ? "Unwrapping…" : "Unwrap"}
           </button>
@@ -325,7 +325,7 @@ export function UnwrapCard() {
 
   if (!ready) {
     return (
-      <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
+      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
         <h2 className="font-semibold">Unwrap</h2>
         <div className="mt-4 h-24 animate-pulse rounded-lg bg-white/5" />
       </section>

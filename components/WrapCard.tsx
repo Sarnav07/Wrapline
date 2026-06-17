@@ -23,7 +23,7 @@ import { useConfirm } from "./ConfirmModal";
 import { NetworkBanner } from "./NetworkBanner";
 
 function StatusLine({ label, pending, error }: { label: string; pending: boolean; error?: Error | null }) {
-  if (pending) return <p className="mt-2 text-xs text-[#FFC83D]">{label}…</p>;
+  if (pending) return <p className="mt-2 text-xs text-accent-blue">{label}…</p>;
   if (error) return <p className="mt-2 text-xs text-rose-300">{humanizeError(error)}</p>;
   return null;
 }
@@ -99,7 +99,7 @@ function WrapInner() {
 
   if (!isConnected) {
     return (
-      <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
+      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
         <h2 className="font-semibold">Faucet &amp; Wrap</h2>
         <p className="mt-3 text-sm text-[#7A8699]">Connect a wallet to claim test tokens and wrap them.</p>
       </section>
@@ -108,7 +108,7 @@ function WrapInner() {
 
   if (!pair) {
     return (
-      <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
+      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
         <h2 className="font-semibold">Faucet &amp; Wrap</h2>
         <p className="mt-3 text-sm text-[#7A8699]">No pairs available on this network.</p>
       </section>
@@ -140,7 +140,7 @@ function WrapInner() {
   }
 
   return (
-    <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
+    <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
       <h2 className="font-semibold">Faucet &amp; Wrap</h2>
       <NetworkBanner />
       {modal}
@@ -228,7 +228,7 @@ function WrapInner() {
           type="button"
           disabled={approve.isPending}
           onClick={() => approve.mutate({})}
-          className="mt-3 w-full rounded-lg bg-[#FFC83D] px-3 py-2 text-sm font-semibold text-[#0B0E14] hover:brightness-95 disabled:opacity-50"
+          className="mt-3 w-full rounded-lg bg-accent-blue px-3 py-2 text-sm font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
         >
           {approve.isPending ? "Approving…" : `Approve ${pair.underlying.symbol}`}
         </button>
@@ -237,7 +237,7 @@ function WrapInner() {
           type="button"
           disabled={!canWrap || shield.isPending}
           onClick={doWrap}
-          className="mt-3 w-full rounded-lg bg-[#FFC83D] px-3 py-2 text-sm font-semibold text-[#0B0E14] hover:brightness-95 disabled:opacity-50"
+          className="mt-3 w-full rounded-lg bg-accent-blue px-3 py-2 text-sm font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
         >
           {shield.isPending ? "Wrapping…" : "Wrap"}
         </button>
@@ -265,7 +265,7 @@ export function WrapCard() {
 
   if (!ready) {
     return (
-      <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
+      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
         <h2 className="font-semibold">Faucet &amp; Wrap</h2>
         <div className="mt-4 h-24 animate-pulse rounded-lg bg-white/5" />
       </section>

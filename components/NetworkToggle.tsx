@@ -29,7 +29,7 @@ export function NetworkToggle() {
             onClick={() => switchChain({ chainId: network.id })}
             className={`rounded-lg px-3 py-1.5 text-sm font-medium transition disabled:cursor-default ${
               active
-                ? "bg-[#FFC83D] text-[#0B0E14]"
+                ? "bg-accent-blue text-accent-blue-foreground"
                 : "text-[#94A2B8] hover:text-[#EAF0FA] disabled:opacity-50"
             }`}
           >
