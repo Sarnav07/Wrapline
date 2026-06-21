@@ -134,7 +134,7 @@ All previous gaps in this section are now resolved or improved:
 
 **Faucet gate**: `WrapCard.tsx:168,187` — faucet button hidden on mainnet; replaced with "The faucet is Sepolia-only" explanation.
 
-**Gap**: The banner fires only for unsupported chains (not Sepolia, not Mainnet). A user on Mainnet who wants to use the faucet gets a text explanation but no banner; minor UX gap, not a blocker.
+**Gap**: RESOLVED. `WrapCard.tsx` now renders an amber inline banner with a "Switch to Sepolia" button when `isMainnet` (not just plain text). Unsupported-chain users still get the `NetworkBanner` at the top of the card + plain text in the faucet section (no double-banner).
 
 ### 4. Unsupported Token Paste (address is not ERC-7984)
 

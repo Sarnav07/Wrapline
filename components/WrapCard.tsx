@@ -7,6 +7,7 @@ import {
   useReadContract,
   useWriteContract,
   useWaitForTransactionReceipt,
+  useSwitchChain,
 } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
 import { formatUnits, parseUnits, zeroAddress } from "viem";
@@ -33,6 +34,7 @@ function WrapInner() {
   const chainId = useChainId();
   const isSepolia = chainId === sepolia.id;
   const isMainnet = chainId === mainnet.id;
+  const { switchChain, isPending: switchPending } = useSwitchChain();
   const { confirm, modal } = useConfirm();
 
   const { validRows: rows } = useRegistryPairs();
@@ -213,6 +215,18 @@ function WrapInner() {
             </p>
           )}
         </>
+      ) : isMainnet ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-amber-400/5 p-3">
+          <p className="text-xs text-amber-200">Faucet is Sepolia-only.</p>
+          <button
+            type="button"
+            disabled={switchPending}
+            onClick={() => switchChain({ chainId: sepolia.id })}
+            className="rounded-md bg-accent-blue px-3 py-1.5 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
+          >
+            {switchPending ? "Switching…" : "Switch to Sepolia"}
+          </button>
+        </div>
       ) : (
         <p className="mt-3 text-xs text-[#7A8699]">The faucet is Sepolia-only. Switch to Sepolia to claim test tokens.</p>
       )}
