@@ -51,3 +51,29 @@ export function customPairsForChain(chainId: number): CustomPair[] {
 
 /** Chains the registry browser supports. */
 export const REGISTRY_CHAINS = [sepolia, mainnet] as const;
+
+/** On-chain Wrappers Registry contract address per supported chain. */
+export const REGISTRY_ADDRESSES: Record<number, Address> = {
+  [sepolia.id]: "0x2f0750Bbb0A246059d80e94c454586a7F27a128e",
+  [mainnet.id]: "0xeb5015fF021DB115aCe010f23F55C2591059bBA0",
+};
+
+/** Minimal ABI for the Wrappers Registry — only what we call directly. */
+export const WRAPPERS_REGISTRY_ABI = [
+  {
+    name: "getTokenConfidentialTokenPairs",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      {
+        type: "tuple[]",
+        components: [
+          { name: "tokenAddress", type: "address" },
+          { name: "confidentialTokenAddress", type: "address" },
+          { name: "isValid", type: "bool" },
+        ],
+      },
+    ],
+  },
+] as const;

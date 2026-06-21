@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { useChainId } from "wagmi";
+import { useChainId, useReadContract, useReadContracts } from "wagmi";
+import { sepolia, mainnet } from "wagmi/chains";
+import { erc20Abi, type Address } from "viem";
 import { useListPairs } from "@zama-fhe/react-sdk";
-import type { Address } from "viem";
-import { customPairsForChain, type TokenMeta } from "@/config/pairs";
+import { customPairsForChain, REGISTRY_ADDRESSES, WRAPPERS_REGISTRY_ABI, type TokenMeta } from "@/config/pairs";
 
 /** A single registry pair, normalised across on-chain and custom sources. */
 export type RegistryRow = {
@@ -78,5 +79,107 @@ export function useRegistryPairs() {
     isError: query.isError,
     error: query.error,
     refetch: query.refetch,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dual-chain registry — reads both Sepolia and Mainnet simultaneously via
+// direct contract calls, bypassing the SDK's active-chain restriction.
+// Used only by RegistryTable (browse view). Action panels use useRegistryPairs.
+// ---------------------------------------------------------------------------
+
+type RawPair = { tokenAddress: Address; confidentialTokenAddress: Address; isValid: boolean };
+
+function buildMetadataContracts(pairs: RawPair[], chainId: number) {
+  return pairs.flatMap((p) => [
+    { abi: erc20Abi, address: p.tokenAddress,             functionName: "symbol"   as const, chainId },
+    { abi: erc20Abi, address: p.tokenAddress,             functionName: "decimals" as const, chainId },
+    { abi: erc20Abi, address: p.confidentialTokenAddress, functionName: "symbol"   as const, chainId },
+    { abi: erc20Abi, address: p.confidentialTokenAddress, functionName: "decimals" as const, chainId },
+  ]);
+}
+
+function zipRows(
+  pairs: RawPair[],
+  meta: { result?: unknown; status: string }[],
+  chainId: number,
+): RegistryRow[] {
+  return pairs.map((p, i) => {
+    const base = i * 4;
+    const underlyingSymbol  = String(meta[base]?.result     ?? "?");
+    const underlyingDec     = Number(meta[base + 1]?.result ?? 18);
+    const confSymbol        = String(meta[base + 2]?.result ?? "?");
+    const confDec           = Number(meta[base + 3]?.result ?? 18);
+    return {
+      chainId,
+      erc20Address:             p.tokenAddress,
+      confidentialTokenAddress: p.confidentialTokenAddress,
+      underlying:   { name: underlyingSymbol, symbol: underlyingSymbol, decimals: underlyingDec },
+      confidential: { name: confSymbol,        symbol: confSymbol,       decimals: confDec },
+      isValid: p.isValid,
+      source: "onchain" as const,
+    };
+  });
+}
+
+/**
+ * Reads both Sepolia and Mainnet Wrappers Registries in parallel, regardless
+ * of which chain the wallet is connected to. Returns a merged RegistryRow[]
+ * tagged with chainId so RegistryTable can show both networks at once.
+ */
+export function useAllChainsPairs() {
+  const sepoliaReg = useReadContract({
+    abi: WRAPPERS_REGISTRY_ABI,
+    address: REGISTRY_ADDRESSES[sepolia.id],
+    functionName: "getTokenConfidentialTokenPairs",
+    chainId: sepolia.id,
+  });
+  const mainnetReg = useReadContract({
+    abi: WRAPPERS_REGISTRY_ABI,
+    address: REGISTRY_ADDRESSES[mainnet.id],
+    functionName: "getTokenConfidentialTokenPairs",
+    chainId: mainnet.id,
+  });
+
+  const sepoliaPairs = (sepoliaReg.data as RawPair[] | undefined) ?? [];
+  const mainnetPairs = (mainnetReg.data as RawPair[] | undefined) ?? [];
+
+  const sepoliaMeta = useReadContracts({
+    contracts: buildMetadataContracts(sepoliaPairs, sepolia.id),
+    allowFailure: true,
+    query: { enabled: sepoliaPairs.length > 0 },
+  });
+  const mainnetMeta = useReadContracts({
+    contracts: buildMetadataContracts(mainnetPairs, mainnet.id),
+    allowFailure: true,
+    query: { enabled: mainnetPairs.length > 0 },
+  });
+
+  const rows = useMemo(() => {
+    const sepoliaRows = zipRows(sepoliaPairs, sepoliaMeta.data ?? [], sepolia.id);
+    const mainnetRows = zipRows(mainnetPairs, mainnetMeta.data ?? [], mainnet.id);
+    const seen = new Set(
+      [...sepoliaRows, ...mainnetRows].map((r) => `${r.chainId}:${r.confidentialTokenAddress.toLowerCase()}`),
+    );
+    const custom: RegistryRow[] = [sepolia.id, mainnet.id].flatMap((cid) =>
+      customPairsForChain(cid)
+        .filter((p) => !seen.has(`${cid}:${p.confidentialTokenAddress.toLowerCase()}`))
+        .map((p) => ({
+          chainId: cid,
+          erc20Address: p.erc20Address,
+          confidentialTokenAddress: p.confidentialTokenAddress,
+          underlying: p.underlying,
+          confidential: p.confidential,
+          isValid: true,
+          source: "custom" as const,
+        })),
+    );
+    return [...sepoliaRows, ...mainnetRows, ...custom];
+  }, [sepoliaPairs, mainnetPairs, sepoliaMeta.data, mainnetMeta.data]);
+
+  return {
+    rows,
+    isLoading: sepoliaReg.isLoading || mainnetReg.isLoading,
+    isError:   sepoliaReg.isError   || mainnetReg.isError,
   };
 }

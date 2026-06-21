@@ -58,6 +58,10 @@ export function humanizeError(error: unknown, fallback = "Something went wrong. 
   if (/relayer|gateway|kms|decrypt(ion)? failed|public.?decrypt/.test(text)) {
     return "The decryption service didn't respond. Wait a moment and retry.";
   }
+  // Faucet mint cap hit.
+  if (/mint cap|cap exceeded|exceeds.*cap|exceeds.*max.*mint|exceeds.*maximum.*mint|mint.*limit/.test(text)) {
+    return "Faucet mint cap reached for this address. You've minted the maximum allowed test tokens.";
+  }
   // Reverts without a decoded reason.
   if (/execution reverted|reverted with/.test(text)) {
     return "The transaction reverted on-chain. Check the amount and your balance.";

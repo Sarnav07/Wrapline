@@ -17,7 +17,7 @@ import {
   useConfidentialBalance,
 } from "@zama-fhe/react-sdk";
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
-import { erc20MintableAbi, FAUCET_AMOUNT } from "@/lib/erc20";
+import { erc20MintableAbi, erc20CapAbi, FAUCET_AMOUNT } from "@/lib/erc20";
 import { humanizeError } from "@/lib/errors";
 import { useConfirm } from "./ConfirmModal";
 import { NetworkBanner } from "./NetworkBanner";
@@ -77,6 +77,27 @@ function WrapInner() {
   // Faucet: mint the underlying ERC-20 (Sepolia cTokenMock).
   const faucet = useWriteContract();
   const faucetReceipt = useWaitForTransactionReceipt({ hash: faucet.data });
+
+  // Optional cap probe: cTokenMock may expose MAX_AMOUNT_PER_ADDRESS + mintedAmount.
+  // retry:false — degrade silently if the function doesn't exist on this contract.
+  const cap = useReadContract({
+    abi: erc20CapAbi,
+    address: pair?.erc20Address,
+    functionName: "MAX_AMOUNT_PER_ADDRESS",
+    query: { enabled: isSepolia && Boolean(pair && address), retry: false },
+  });
+  const minted = useReadContract({
+    abi: erc20CapAbi,
+    address: pair?.erc20Address,
+    functionName: "mintedAmount",
+    args: address ? [address] : undefined,
+    query: { enabled: isSepolia && Boolean(pair && address) && cap.isSuccess, retry: false },
+  });
+  const remainingMint = useMemo(() => {
+    if (cap.data === undefined || minted.data === undefined) return undefined;
+    const rem = (cap.data as bigint) - (minted.data as bigint);
+    return rem < 0n ? 0n : rem;
+  }, [cap.data, minted.data]);
 
   // Approve + shield via the SDK (config: confidential token doubles as the wrapper).
   const zamaConfig = { tokenAddress: pair?.confidentialTokenAddress ?? zeroAddress, wrapperAddress: pair?.confidentialTokenAddress ?? zeroAddress };
@@ -166,23 +187,32 @@ function WrapInner() {
 
       {/* Faucet (Sepolia only) */}
       {isSepolia ? (
-        <button
-          type="button"
-          disabled={faucet.isPending || faucetReceipt.isLoading}
-          onClick={() =>
-            faucet.writeContract({
-              abi: erc20MintableAbi,
-              address: pair.erc20Address,
-              functionName: "mint",
-              args: [address!, parseUnits(String(FAUCET_AMOUNT), decimals)],
-            })
-          }
-          className="mt-3 w-full rounded-lg bg-white/5 px-3 py-2 text-sm font-medium ring-1 ring-white/10 hover:bg-white/10 disabled:opacity-50"
-        >
-          {faucet.isPending || faucetReceipt.isLoading
-            ? "Minting…"
-            : `Faucet: mint ${FAUCET_AMOUNT} ${pair.underlying.symbol}`}
-        </button>
+        <>
+          <button
+            type="button"
+            disabled={faucet.isPending || faucetReceipt.isLoading || remainingMint === 0n}
+            onClick={() =>
+              faucet.writeContract({
+                abi: erc20MintableAbi,
+                address: pair.erc20Address,
+                functionName: "mint",
+                args: [address!, parseUnits(String(FAUCET_AMOUNT), decimals)],
+              })
+            }
+            className="mt-3 w-full rounded-lg bg-white/5 px-3 py-2 text-sm font-medium ring-1 ring-white/10 hover:bg-white/10 disabled:opacity-50"
+          >
+            {faucet.isPending || faucetReceipt.isLoading
+              ? "Minting…"
+              : remainingMint === 0n
+              ? `Mint cap reached — no more ${pair.underlying.symbol} available`
+              : `Faucet: mint ${FAUCET_AMOUNT} ${pair.underlying.symbol}`}
+          </button>
+          {remainingMint !== undefined && remainingMint > 0n && (
+            <p className="mt-1 text-xs text-[#7A8699]">
+              Remaining mintable: {formatUnits(remainingMint, decimals)} {pair.underlying.symbol}
+            </p>
+          )}
+        </>
       ) : (
         <p className="mt-3 text-xs text-[#7A8699]">The faucet is Sepolia-only. Switch to Sepolia to claim test tokens.</p>
       )}

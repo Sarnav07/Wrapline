@@ -21,3 +21,25 @@ export const erc20MintableAbi = [
 
 /** How many whole tokens the faucet mints per claim. */
 export const FAUCET_AMOUNT = 1000;
+
+/**
+ * ABI fragments for optional cTokenMock cap functions. These may not exist on
+ * every deployed contract — callers must use `retry: false` and degrade
+ * gracefully on error.
+ */
+export const erc20CapAbi = [
+  {
+    type: "function",
+    name: "MAX_AMOUNT_PER_ADDRESS",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "mintedAmount",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+] as const;

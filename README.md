@@ -7,7 +7,7 @@
 >
 > Built for the **Zama Developer Program — Season 3, Bounty Track**.
 
-- **Live app:** _coming soon_
+- **Live app:** https://wrapline.vercel.app/
 - **Networks:** Ethereum Sepolia (testnet) · Ethereum Mainnet
 - **Status:** active development — M0 (verification + scaffold) complete.
 
@@ -47,21 +47,33 @@ Token metadata, `rate()`, and `underlying()` are read at runtime — never hardc
 
 Two supported paths:
 
-- **Canonical (recommended):** register it onchain in the official registry via
-  `registry.registerConfidentialToken(erc20, wrapper)`. It then appears in Wrapline (and every
-  other registry consumer) automatically — no code change.
+- **Canonical (recommended):** call `registerConfidentialToken(erc20Address, wrapperAddress)` on
+  the deployed Wrappers Registry:
+  - Sepolia: `0x2f0750Bbb0A246059d80e94c454586a7F27a128e`
+  - Mainnet: `0xeb5015fF021DB115aCe010f23F55C2591059bBA0`
+
+  The pair then appears in Wrapline (and every other registry consumer) automatically — no code
+  change needed.
+
 - **Local / dev:** add an entry to `config/pairs.ts`:
   ```ts
-  export const CUSTOM_PAIRS = [
+  // config/pairs.ts
+  import { sepolia } from "wagmi/chains"; // or mainnet
+
+  export const CUSTOM_PAIRS: CustomPair[] = [
     {
-      network: "sepolia",
-      confidential: "0xYourWrapper",   // ERC-7984
-      erc20: "0xYourUnderlying",       // optional; else resolved via underlying()
-      faucet: { mintFn: "mint", cap: 1_000_000n }, // optional (testnet mocks)
+      chainId: sepolia.id,                                     // 11155111; use mainnet.id (1) for mainnet
+      erc20Address: "0xYourUnderlying...",                     // ERC-20
+      confidentialTokenAddress: "0xYourWrapper...",            // ERC-7984
+      underlying: { name: "My Token",              symbol: "MTK",  decimals: 18 },
+      confidential: { name: "Confidential My Token", symbol: "cMTK", decimals: 18 },
     },
   ];
   ```
-  Metadata is auto-resolved, so no further changes are needed.
+  **Metadata (`name`, `symbol`, `decimals`) must be declared manually** — it is not resolved
+  on-chain for local pairs. The app reads `underlying` and `confidential` directly from this
+  config object. If the same `confidentialTokenAddress` also appears in the onchain registry,
+  the onchain entry takes precedence and this entry is silently ignored.
 
 ## Tech stack
 

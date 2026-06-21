@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { mainnet } from "wagmi/chains";
 import type { Address } from "viem";
-import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
-import { NetworkToggle } from "./NetworkToggle";
+import { useAllChainsPairs, type RegistryRow } from "@/lib/registry";
 
 function explorerBase(chainId: number) {
   return chainId === mainnet.id ? "https://etherscan.io" : "https://sepolia.etherscan.io";
@@ -27,11 +26,17 @@ function AddressLink({ address, chainId }: { address: Address; chainId: number }
   );
 }
 
-function CoverageBadge({ total, onchain, custom }: { total: number; onchain: number; custom: number }) {
+function NetworkBadge({ chainId }: { chainId: number }) {
+  const isMainnet = chainId === mainnet.id;
   return (
-    <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-[#94A2B8] ring-1 ring-white/10">
-      {total} {total === 1 ? "pair" : "pairs"} · {onchain} onchain
-      {custom > 0 ? ` · ${custom} custom` : ""}
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs ring-1 ${
+        isMainnet
+          ? "bg-violet-400/10 text-violet-300 ring-violet-400/30"
+          : "bg-amber-400/10 text-amber-300 ring-amber-400/30"
+      }`}
+    >
+      {isMainnet ? "Mainnet" : "Sepolia"}
     </span>
   );
 }
@@ -40,14 +45,15 @@ function PairRow({ row }: { row: RegistryRow }) {
   return (
     <tr className="border-t border-white/5">
       <td className="py-3 pr-4">
+        <NetworkBadge chainId={row.chainId} />
+      </td>
+      <td className="py-3 pr-4">
         <div className="font-medium">{row.underlying.symbol}</div>
-        <div className="text-xs text-[#7A8699]">{row.underlying.name}</div>
         <AddressLink address={row.erc20Address} chainId={row.chainId} />
       </td>
       <td className="py-3 pr-4 text-center text-[#7A8699]">→</td>
       <td className="py-3 pr-4">
         <div className="font-medium">{row.confidential.symbol}</div>
-        <div className="text-xs text-[#7A8699]">{row.confidential.name}</div>
         <AddressLink address={row.confidentialTokenAddress} chainId={row.chainId} />
       </td>
       <td className="py-3 pr-4 text-right tabular-nums text-[#94A2B8]">{row.underlying.decimals}</td>
@@ -67,18 +73,20 @@ function PairRow({ row }: { row: RegistryRow }) {
 }
 
 function RegistryInner() {
-  const { rows, coverage, chainId, isLoading, isError, error, refetch } = useRegistryPairs();
+  const { rows, isLoading, isError } = useAllChainsPairs();
+  const total = rows.length;
 
   return (
     <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="font-semibold">Registry</h2>
-          {!isLoading && !isError && (
-            <CoverageBadge total={coverage.total} onchain={coverage.onchain} custom={coverage.custom} />
+          {!isLoading && !isError && total > 0 && (
+            <span className="rounded-full bg-white/5 px-3 py-1 text-xs text-[#94A2B8] ring-1 ring-white/10">
+              {total} {total === 1 ? "pair" : "pairs"} · Sepolia + Mainnet
+            </span>
           )}
         </div>
-        <NetworkToggle />
       </div>
 
       {isLoading && (
@@ -91,21 +99,13 @@ function RegistryInner() {
 
       {isError && (
         <div className="mt-6 rounded-lg border border-rose-400/20 bg-rose-400/5 p-4 text-sm text-rose-200">
-          <p>Couldn&apos;t load the registry for chain {chainId}.</p>
-          {error?.message && <p className="mt-1 text-xs text-rose-300/70">{error.message}</p>}
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="mt-3 rounded-md bg-rose-400/10 px-3 py-1.5 text-xs font-medium text-rose-100 ring-1 ring-rose-400/30 hover:bg-rose-400/20"
-          >
-            Retry
-          </button>
+          <p>Couldn&apos;t load the registry. Check your connection and reload.</p>
         </div>
       )}
 
       {!isLoading && !isError && rows.length === 0 && (
         <p className="mt-6 text-sm text-[#7A8699]">
-          No pairs found for this network. Add one in <code className="text-[#94A2B8]">config/pairs.ts</code>.
+          No pairs found. Add one in <code className="text-[#94A2B8]">config/pairs.ts</code>.
         </p>
       )}
 
@@ -114,6 +114,7 @@ function RegistryInner() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="text-xs uppercase tracking-wider text-[#7A8699]">
+                <th className="pb-2 pr-4 font-medium">Network</th>
                 <th className="pb-2 pr-4 font-medium">ERC-20</th>
                 <th className="pb-2 pr-4" />
                 <th className="pb-2 pr-4 font-medium">ERC-7984</th>
@@ -123,7 +124,7 @@ function RegistryInner() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <PairRow key={`${row.confidentialTokenAddress}-${row.source}`} row={row} />
+                <PairRow key={`${row.chainId}-${row.confidentialTokenAddress}`} row={row} />
               ))}
             </tbody>
           </table>
@@ -133,12 +134,7 @@ function RegistryInner() {
   );
 }
 
-/**
- * Post-mount gate: `useListPairs` needs the ZamaProvider context, which only
- * mounts after hydration. Rendering the inner table on the first client paint
- * would call the hook outside the provider. The skeleton flips to the table in
- * the same commit the provider mounts.
- */
+/** Post-mount gate: avoids SSR mismatch before hydration completes. */
 export function RegistryTable() {
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
