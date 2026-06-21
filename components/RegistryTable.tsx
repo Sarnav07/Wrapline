@@ -43,7 +43,7 @@ function NetworkBadge({ chainId }: { chainId: number }) {
 
 function PairRow({ row }: { row: RegistryRow }) {
   return (
-    <tr className="border-t border-white/5">
+    <tr className={`border-t border-white/5${row.isValid ? "" : " opacity-50"}`}>
       <td className="py-3 pr-4">
         <NetworkBadge chainId={row.chainId} />
       </td>
@@ -58,15 +58,22 @@ function PairRow({ row }: { row: RegistryRow }) {
       </td>
       <td className="py-3 pr-4 text-right tabular-nums text-[#94A2B8]">{row.underlying.decimals}</td>
       <td className="py-3 text-right">
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs ring-1 ${
-            row.source === "custom"
-              ? "bg-accent-blue/10 text-accent-blue ring-accent-blue/30"
-              : "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30"
-          }`}
-        >
-          {row.source}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          {!row.isValid && (
+            <span className="rounded-full bg-rose-400/10 px-2 py-0.5 text-xs text-rose-300 ring-1 ring-rose-400/30">
+              deprecated
+            </span>
+          )}
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs ring-1 ${
+              row.source === "custom"
+                ? "bg-accent-blue/10 text-accent-blue ring-accent-blue/30"
+                : "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30"
+            }`}
+          >
+            {row.source}
+          </span>
+        </div>
       </td>
     </tr>
   );

@@ -112,6 +112,23 @@ pnpm start    # serve the production build
 pnpm lint     # eslint
 ```
 
+### Registering a new pair on-chain
+
+`scripts/register-pair.sh` calls `registerConfidentialToken` on the deployed Wrappers Registry via
+[Foundry's `cast`](https://getfoundry.sh). Run it from the deployer account (the account that owns the wrapper contract):
+
+```bash
+PRIVATE_KEY=0x…      \
+ERC20_ADDRESS=0x…    \
+WRAPPER_ADDRESS=0x…  \
+bash scripts/register-pair.sh
+
+# Mainnet:
+CHAIN=mainnet PRIVATE_KEY=0x… ERC20_ADDRESS=0x… WRAPPER_ADDRESS=0x… bash scripts/register-pair.sh
+```
+
+Once the tx confirms the pair appears in Wrapline automatically — no code change required.
+
 ## Project structure
 
 ```

@@ -203,6 +203,21 @@ function UnwrapInner() {
   }, [rows, scanTick]);
   const rescan = useCallback(() => setScanTick((t) => t + 1), []);
 
+  // Manual recovery: seed local storage from a user-provided tx hash (cross-device path).
+  const [showRecovery, setShowRecovery] = useState(false);
+  const [recoveryHash, setRecoveryHash] = useState("");
+  const [recoveryConf, setRecoveryConf] = useState("");
+  const validTxHash = /^0x[0-9a-fA-F]{64}$/.test(recoveryHash);
+
+  const seedRecovery = useCallback(async () => {
+    const wrapper = (recoveryConf || pair?.confidentialTokenAddress) as Address | undefined;
+    if (!wrapper || !validTxHash) return;
+    await savePendingUnshield(storage, wrapper, recoveryHash as Hex);
+    setRecoveryHash("");
+    setShowRecovery(false);
+    rescan();
+  }, [recoveryConf, pair?.confidentialTokenAddress, validTxHash, recoveryHash, rescan]);
+
   // Reset reveal when the selected token changes.
   useEffect(() => setRevealed(false), [pair?.confidentialTokenAddress]);
 
@@ -276,6 +291,51 @@ function UnwrapInner() {
           ))}
         </div>
       )}
+
+      {/* Cross-device recovery: seed a tx hash manually so ResumeEntry can finalize it. */}
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => setShowRecovery((s) => !s)}
+          className="text-xs text-[#7A8699] underline-offset-2 hover:text-[#94A2B8] hover:underline"
+        >
+          {showRecovery ? "Hide recovery" : "Recover unwrap from another device…"}
+        </button>
+        {showRecovery && (
+          <div className="mt-2 space-y-2 rounded-lg border border-white/10 bg-[#070A12] p-3">
+            <p className="text-xs text-[#7A8699]">
+              Paste your unwrap transaction hash and select the token to resume finalization.
+            </p>
+            <select
+              value={recoveryConf}
+              onChange={(e) => setRecoveryConf(e.target.value)}
+              className="w-full rounded-lg border border-white/10 bg-[#0E1424] px-3 py-2 text-sm"
+            >
+              <option value="">Select token…</option>
+              {validRows.map((r) => (
+                <option key={r.confidentialTokenAddress} value={r.confidentialTokenAddress}>
+                  {r.confidential.symbol}
+                </option>
+              ))}
+            </select>
+            <input
+              spellCheck={false}
+              placeholder="0x… (66-char tx hash)"
+              value={recoveryHash}
+              onChange={(e) => setRecoveryHash(e.target.value.trim())}
+              className="w-full rounded-lg border border-white/10 bg-[#0E1424] px-3 py-2 font-mono text-xs"
+            />
+            <button
+              type="button"
+              disabled={!validTxHash || !recoveryConf}
+              onClick={seedRecovery}
+              className="w-full rounded-lg bg-accent-blue px-3 py-2 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
+            >
+              Resume
+            </button>
+          </div>
+        )}
+      </div>
 
       {pair && (
         <>
