@@ -38,8 +38,7 @@ next-env.d.ts
 # typescript incremental cache
 tsconfig.tsbuildinfo
 
-# bounty: internal planning + brand assets, not part of the shipped app
-/docs/
+# bounty: brand assets and internal scratch files, not part of the shipped app
 /brand/
 /design/
 /frontend-track.md
