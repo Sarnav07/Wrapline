@@ -15,6 +15,7 @@ Audited: 2026-06-22 against current codebase (refreshed same day).
 - **Cross-device unwrap recovery** — `UnwrapCard.tsx` now includes a collapsible "Recover unwrap from another device…" form. User pastes a tx hash + selects token → `savePendingUnshield` seeds local storage → `rescan()` → existing `ResumeEntry` handles finalization. Auto-detection across devices still not possible (indexedDB is local), but the gap is bridged for manual recovery.
 - **Faucet mint cap handling** — `lib/erc20.ts:erc20CapAbi` probes `MAX_AMOUNT_PER_ADDRESS` + `mintedAmount` on-chain; `WrapCard.tsx` shows remaining mintable tokens and disables the faucet button at zero; `lib/errors.ts` adds cap-exceeded revert pattern before the generic revert catch.
 - **CUSTOM_PAIRS populated** — `config/pairs.ts:45-103` now contains all 8 official Zama Sepolia cTokenMock pairs as a hardcoded safety net. Addresses verified via live `eth_call` to `getTokenConfidentialTokenPairs()` (selector `0xf63a0980`) on Sepolia. Dedup logic in `useRegistryPairs` + `useAllChainsPairs` silently ignores these when the on-chain registry returns the same `confidentialTokenAddress`. Closes the "cTokenMock coverage" submission blocker.
+- **Faucet switch-to-Sepolia banner** — `WrapCard.tsx` now renders an amber inline banner with a one-click "Switch to Sepolia" button when `isMainnet`, instead of plain text. Closes the error-handling gap #3 (network mismatch / faucet section).
 
 ---
 
@@ -55,7 +56,7 @@ All previous gaps in this section are now resolved or improved:
 - [ ] Manually verify https://wrapline.vercel.app/ is live, wallet-connectable, and functional on Sepolia
 - [ ] Check Vercel project settings: confirm `NEXT_PUBLIC_SEPOLIA_RPC_URL`, `NEXT_PUBLIC_MAINNET_RPC_URL`, and `NEXT_PUBLIC_WC_PROJECT_ID` are set
 - [ ] Confirm https://github.com/Sarnav07/Wrapline is set to Public on GitHub
-- [ ] Enumerate official Zama Sepolia cTokenMock addresses from Zama docs; cross-reference against what the live app shows; add any missing ones to `config/pairs.ts` CUSTOM_PAIRS with full metadata
+- [x] ~~Enumerate official Zama Sepolia cTokenMock addresses~~ — DONE. All 8 pairs in `config/pairs.ts:CUSTOM_PAIRS`; addresses verified via live RPC.
 - [ ] Record a max-3-minute demo video showing: registry browse (both networks), faucet claim, wrap (with approval step), EIP-712 decrypt, unwrap (3-step stepper), arbitrary ERC-7984 paste-decrypt, and how to add a new pair
 - [ ] Publish an X thread or article introducing Wrapline; add the link to README.md
 - [ ] Add the GitHub repo URL explicitly to README.md (currently absent from the README body text)
@@ -132,7 +133,7 @@ All previous gaps in this section are now resolved or improved:
 
 **Transaction-level catch**: `lib/errors.ts:38-39` — `/chain mismatch|does not match the target chain|chain "?\d+"? does not|wrong network/` → "Your wallet is on the wrong network. Switch networks and try again."
 
-**Faucet gate**: `WrapCard.tsx:168,187` — faucet button hidden on mainnet; replaced with "The faucet is Sepolia-only" explanation.
+**Faucet gate**: `WrapCard.tsx` — faucet button hidden on Mainnet; replaced with an amber inline banner + "Switch to Sepolia" one-click button (`isMainnet` branch). Unsupported-chain users get `NetworkBanner` at card top + plain text in faucet section (no double-banner).
 
 **Gap**: RESOLVED. `WrapCard.tsx` now renders an amber inline banner with a "Switch to Sepolia" button when `isMainnet` (not just plain text). Unsupported-chain users still get the `NetworkBanner` at the top of the card + plain text in the faucet section (no double-banner).
 
