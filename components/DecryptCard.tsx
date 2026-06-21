@@ -8,6 +8,8 @@ import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
 import { humanizeError } from "@/lib/errors";
 import { NetworkBanner } from "./NetworkBanner";
 
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
+
 function formatClear(value: bigint | boolean | `0x${string}`, decimals: number) {
   if (typeof value === "bigint") return formatUnits(value, decimals);
   return String(value);
@@ -100,7 +102,10 @@ function DecryptRow({
 function PasteDecrypt() {
   const [input, setInput] = useState("");
   const valid = isAddress(input);
-  const isConfidential = useIsConfidential(input as Address, { enabled: valid });
+  const isConfidential = useIsConfidential(
+    valid ? (input as Address) : ZERO_ADDRESS,
+    { enabled: valid },
+  );
 
   return (
     <div>
@@ -114,6 +119,9 @@ function PasteDecrypt() {
       />
       {input.length > 0 && !valid && <p className="mt-2 text-xs text-rose-300">Not a valid address.</p>}
       {valid && isConfidential.isLoading && <p className="mt-2 text-xs text-[#7A8699]">Checking interface…</p>}
+      {valid && isConfidential.isError && (
+        <p className="mt-2 text-xs text-rose-300">Could not check token interface. Check your connection and try again.</p>
+      )}
       {valid && isConfidential.data === false && (
         <p className="mt-2 text-xs text-rose-300">This address is not an ERC-7984 confidential token.</p>
       )}
