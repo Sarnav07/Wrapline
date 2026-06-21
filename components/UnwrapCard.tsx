@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { mainnet } from "wagmi/chains";
-import { parseUnits, zeroAddress, type Address, type Hex } from "viem";
+import { formatUnits, numberToHex, parseUnits, zeroAddress, type Address, type Hex } from "viem";
 import {
+  useConfidentialBalance,
   useUnshield,
+  useUserDecrypt,
   useResumeUnshield,
   indexedDBStorage,
   savePendingUnshield,
@@ -128,7 +130,7 @@ function ResumeEntry({
 }
 
 function UnwrapInner() {
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const isMainnet = chainId === mainnet.id;
   const { confirm, modal } = useConfirm();
@@ -159,6 +161,29 @@ function UnwrapInner() {
   };
   const unshield = useUnshield(config);
 
+  // Confidential balance display — read the handle, reveal on demand.
+  const [revealed, setRevealed] = useState(false);
+  const confBalance = useConfidentialBalance(
+    { tokenAddress: pair?.confidentialTokenAddress ?? zeroAddress },
+    { enabled: Boolean(pair && address) },
+  );
+  const handleHex = useMemo(
+    () =>
+      confBalance.data !== undefined && confBalance.data !== 0n
+        ? numberToHex(confBalance.data, { size: 32 })
+        : undefined,
+    [confBalance.data],
+  );
+  const decrypt = useUserDecrypt(
+    { handles: handleHex ? [{ handle: handleHex, contractAddress: pair?.confidentialTokenAddress ?? zeroAddress }] : [] },
+    { enabled: revealed && Boolean(handleHex) },
+  );
+  const cleartext = decrypt.data ? Object.values(decrypt.data)[0] : undefined;
+  const confBalanceFmt =
+    cleartext !== undefined
+      ? `${formatUnits(cleartext as bigint, pair?.confidential.decimals ?? 18)} ${pair?.confidential.symbol ?? ""}`
+      : null;
+
   // Scan every wrapper on this chain for an interrupted unwrap (resume drawer).
   const [pending, setPending] = useState<{ wrapper: Address; symbol: string; txHash: Hex }[]>([]);
   const [scanTick, setScanTick] = useState(0);
@@ -177,6 +202,9 @@ function UnwrapInner() {
     };
   }, [rows, scanTick]);
   const rescan = useCallback(() => setScanTick((t) => t + 1), []);
+
+  // Reset reveal when the selected token changes.
+  useEffect(() => setRevealed(false), [pair?.confidentialTokenAddress]);
 
   if (!isConnected) {
     return (
@@ -266,6 +294,28 @@ function UnwrapInner() {
               </option>
             ))}
           </select>
+
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <span className="text-[#7A8699]">{pair.confidential.symbol} balance</span>
+            {confBalance.isLoading ? (
+              <span className="text-xs text-[#7A8699]">Loading…</span>
+            ) : confBalance.data === 0n ? (
+              <span className="tabular-nums">0 {pair.confidential.symbol}</span>
+            ) : confBalanceFmt !== null ? (
+              <span className="tabular-nums text-emerald-300">{confBalanceFmt}</span>
+            ) : handleHex ? (
+              <button
+                type="button"
+                disabled={revealed && decrypt.isFetching}
+                onClick={() => setRevealed(true)}
+                className="text-xs text-accent-blue hover:underline disabled:opacity-50"
+              >
+                {revealed && decrypt.isFetching ? "Decrypting…" : "Reveal"}
+              </button>
+            ) : (
+              <span className="tabular-nums">—</span>
+            )}
+          </div>
 
           <label className="mt-4 block text-xs uppercase tracking-wider text-[#7A8699]">Amount to unwrap</label>
           <input
