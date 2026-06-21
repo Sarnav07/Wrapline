@@ -134,12 +134,12 @@ function UnwrapInner() {
   const chainId = useChainId();
   const isMainnet = chainId === mainnet.id;
   const { confirm, modal } = useConfirm();
-  const { rows } = useRegistryPairs();
+  const { rows, validRows } = useRegistryPairs();
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
   const pair: RegistryRow | undefined = useMemo(
-    () => rows.find((r) => r.confidentialTokenAddress === selectedConf) ?? rows[0],
-    [rows, selectedConf],
+    () => validRows.find((r) => r.confidentialTokenAddress === selectedConf) ?? validRows[0],
+    [validRows, selectedConf],
   );
 
   const [amount, setAmount] = useState("");
@@ -288,7 +288,7 @@ function UnwrapInner() {
             }}
             className="mt-1 w-full rounded-lg border border-white/10 bg-[#070A12] px-3 py-2 text-sm"
           >
-            {rows.map((r) => (
+            {validRows.map((r) => (
               <option key={r.confidentialTokenAddress} value={r.confidentialTokenAddress}>
                 {r.confidential.symbol} → {r.underlying.symbol}
               </option>

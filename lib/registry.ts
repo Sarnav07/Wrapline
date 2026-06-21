@@ -71,6 +71,7 @@ export function useRegistryPairs() {
 
   return {
     rows,
+    validRows: rows.filter((r) => r.isValid),
     coverage,
     chainId,
     isLoading: query.isLoading,

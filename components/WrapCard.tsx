@@ -35,7 +35,7 @@ function WrapInner() {
   const isMainnet = chainId === mainnet.id;
   const { confirm, modal } = useConfirm();
 
-  const { rows } = useRegistryPairs();
+  const { validRows: rows } = useRegistryPairs();
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
   // Keep a valid selection as the chain (and therefore the pair list) changes.

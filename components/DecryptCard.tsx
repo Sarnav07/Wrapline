@@ -202,7 +202,7 @@ function AutoDetect({ rows }: { rows: RegistryRow[] }) {
 
 function DecryptInner() {
   const { isConnected } = useAccount();
-  const { rows } = useRegistryPairs();
+  const { validRows: rows } = useRegistryPairs();
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
   const pair = useMemo(
