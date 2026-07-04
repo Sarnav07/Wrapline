@@ -28,7 +28,7 @@ const CATEGORIES: { id: string; items: QA[] }[] = [
       },
       {
         q: "Who is it for?",
-        a: "Anyone who wants on-chain balances that stay private by default — without giving up custody or verifiability.",
+        a: "Anyone who wants on-chain balances that stay private by default, without giving up custody or verifiability.",
       },
     ],
   },
@@ -41,7 +41,7 @@ const CATEGORIES: { id: string; items: QA[] }[] = [
       },
       {
         q: "How do I wrap?",
-        a: "Approve the wrapper, then wrap — the ERC-20 is deposited and its confidential twin is minted. Unwrapping reverses it.",
+        a: "Approve the wrapper, then wrap. The ERC-20 is deposited and its confidential twin is minted. Unwrapping reverses it.",
       },
     ],
   },
@@ -50,7 +50,7 @@ const CATEGORIES: { id: string; items: QA[] }[] = [
     items: [
       {
         q: "How do I see my balance?",
-        a: "Reveal it via EIP-712 user-decryption — one signature, then the session is cached.",
+        a: "Reveal it via EIP-712 user-decryption: one signature, then the session is cached.",
       },
       {
         q: "Can anyone else read my balance?",

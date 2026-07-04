@@ -4,9 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useAccount, useReadContract } from "wagmi";
 import { erc20Abi, formatUnits, isAddress, numberToHex, type Address } from "viem";
 import { useConfidentialBalance, useIsConfidential, useUserDecrypt } from "@zama-fhe/react-sdk";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
 import { humanizeError } from "@/lib/errors";
 import { NetworkBanner } from "./NetworkBanner";
+import { TokenSelect } from "./app/TokenSelect";
+import { TokenIcon } from "./app/TokenIcon";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 
@@ -17,7 +20,7 @@ function formatClear(value: bigint | boolean | `0x${string}`, decimals: number) 
 
 /**
  * One decryptable token. Reads the connected wallet's encrypted balance handle,
- * and — only after the user clicks Reveal — runs EIP-712 user-decryption. The
+ * and only after the user clicks Reveal runs EIP-712 user-decryption. The
  * holder can always decrypt their own balance (ACL granted on mint/transfer), so
  * no explicit allow step is needed here. The first reveal prompts a signature;
  * the SDK caches the session keypair, so later reveals don't re-prompt.
@@ -61,11 +64,14 @@ function DecryptRow({
   useEffect(() => setRevealed(false), [tokenAddress]);
 
   return (
-    <div className="rounded-lg border border-white/10 bg-[#070A12] p-4">
+    <div className="rounded-2xl border border-white/8 bg-black/25 p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-mono text-xs text-[#94A2B8]">
-          {symbol ? `${symbol} · ` : ""}
-          {tokenAddress.slice(0, 6)}…{tokenAddress.slice(-4)}
+        <span className="flex min-w-0 items-center gap-2">
+          {symbol && <TokenIcon symbol={symbol} size={24} />}
+          <span className="min-w-0 font-mono text-xs text-[#94A2B8]">
+            {symbol ? `${symbol} · ` : ""}
+            {tokenAddress.slice(0, 6)}…{tokenAddress.slice(-4)}
+          </span>
         </span>
         {!isZero && (
           <button
@@ -115,7 +121,7 @@ function PasteDecrypt() {
         placeholder="0x…"
         value={input}
         onChange={(e) => setInput(e.target.value.trim())}
-        className="mt-1 w-full rounded-lg border border-white/10 bg-[#070A12] px-3 py-2 font-mono text-sm"
+        className="mt-1 w-full rounded-xl border border-white/10 bg-black/25 px-3 py-2 font-mono text-sm outline-none focus:ring-1 focus:ring-accent-blue/60"
       />
       {input.length > 0 && !valid && <p className="mt-2 text-xs text-rose-300">Not a valid address.</p>}
       {valid && isConfidential.isLoading && <p className="mt-2 text-xs text-[#7A8699]">Checking interface…</p>}
@@ -200,8 +206,9 @@ function AutoDetect({ rows }: { rows: RegistryRow[] }) {
   );
 }
 
-function DecryptInner() {
+export function DecryptPanel() {
   const { isConnected } = useAccount();
+  const { openConnectModal } = useConnectModal();
   const { validRows: rows } = useRegistryPairs();
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
 
@@ -210,43 +217,38 @@ function DecryptInner() {
     [rows, selectedConf],
   );
 
-  if (!isConnected) {
-    return (
-      <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
-        <h2 className="font-semibold">Decrypt balance</h2>
-        <p className="mt-3 text-sm text-[#7A8699]">Connect a wallet to decrypt your confidential balances.</p>
-      </section>
-    );
-  }
-
   return (
-    <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
-      <h2 className="font-semibold">Decrypt balance</h2>
-      <p className="mt-1 text-xs text-[#7A8699]">
+    <div className="space-y-4">
+      <p className="text-xs text-[#7A8699]">
         Reveal your own ERC-7984 balance via EIP-712. The first reveal asks for one signature, then reuses the
         session.
       </p>
       <NetworkBanner />
 
-      <div className="mt-4">
-        <AutoDetect rows={rows} />
-      </div>
+      {!isConnected && (
+        <button
+          type="button"
+          onClick={() => openConnectModal?.()}
+          className="w-full rounded-pill bg-accent-blue px-3 py-3 text-sm font-semibold text-accent-blue-foreground shadow-float-blue transition hover:brightness-110"
+        >
+          Connect Wallet
+        </button>
+      )}
+
+      <AutoDetect rows={rows} />
 
       {/* Registry token */}
       {pair && (
-        <div className="mt-4">
-          <label className="block text-xs uppercase tracking-wider text-[#7A8699]">Registry token</label>
-          <select
-            value={pair.confidentialTokenAddress}
-            onChange={(e) => setSelectedConf(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-[#070A12] px-3 py-2 text-sm"
-          >
-            {rows.map((r) => (
-              <option key={r.confidentialTokenAddress} value={r.confidentialTokenAddress}>
-                {r.confidential.symbol}
-              </option>
-            ))}
-          </select>
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="block text-xs uppercase tracking-wider text-[#7A8699]">Registry token</label>
+            <TokenSelect
+              rows={rows}
+              value={pair.confidentialTokenAddress}
+              onChange={setSelectedConf}
+              variant="confidential"
+            />
+          </div>
           <div className="mt-3">
             <DecryptRow
               tokenAddress={pair.confidentialTokenAddress}
@@ -257,10 +259,10 @@ function DecryptInner() {
         </div>
       )}
 
-      <div className="mt-6 border-t border-white/5 pt-5">
+      <div className="border-t border-white/5 pt-5">
         <PasteDecrypt />
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -270,12 +272,7 @@ export function DecryptCard() {
   useEffect(() => setReady(true), []);
 
   if (!ready) {
-    return (
-      <section className="rounded-2xl border border-white/8 bg-[#0E1424] p-6">
-        <h2 className="font-semibold">Decrypt balance</h2>
-        <div className="mt-4 h-24 animate-pulse rounded-lg bg-white/5" />
-      </section>
-    );
+    return <div className="h-24 animate-pulse rounded-lg bg-white/5" />;
   }
-  return <DecryptInner />;
+  return <DecryptPanel />;
 }

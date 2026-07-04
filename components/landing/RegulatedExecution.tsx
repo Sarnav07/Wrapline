@@ -31,7 +31,7 @@ export function RegulatedExecution() {
             <p className="mt-5 text-lg leading-relaxed text-text-muted">
               Approve, wrap, and unwrap directly against the official Wrappers
               Registry. Every step is a real transaction you can verify on
-              Etherscan — no bridge, no custodian, no off-chain trust.
+              Etherscan: no bridge, no custodian, no off-chain trust.
             </p>
             <div className="mt-7">
               <PillButton href="/app" variant="primary">

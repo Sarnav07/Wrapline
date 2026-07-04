@@ -75,7 +75,7 @@ export function FeatureCards() {
                 Shielded by default
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-white/75">
-                Balances are encrypted on-chain with FHE — only the holder can
+                Balances are encrypted on-chain with FHE, only the holder can
                 decrypt them.
               </p>
             </GlassCard>

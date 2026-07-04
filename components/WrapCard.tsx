@@ -10,6 +10,7 @@ import {
   useSwitchChain,
 } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { formatUnits, parseUnits, zeroAddress } from "viem";
 import {
   useApproveUnderlying,
@@ -22,6 +23,9 @@ import { erc20MintableAbi, erc20CapAbi, FAUCET_AMOUNT } from "@/lib/erc20";
 import { humanizeError } from "@/lib/errors";
 import { useConfirm } from "./ConfirmModal";
 import { NetworkBanner } from "./NetworkBanner";
+import { TokenSelect } from "./app/TokenSelect";
+import { TokenIcon } from "./app/TokenIcon";
+import { SwapPanel } from "./app/SwapPanel";
 
 function StatusLine({ label, pending, error }: { label: string; pending: boolean; error?: Error | null }) {
   if (pending) return <p className="mt-2 text-xs text-accent-blue">{label}…</p>;
@@ -29,12 +33,23 @@ function StatusLine({ label, pending, error }: { label: string; pending: boolean
   return null;
 }
 
-function WrapInner() {
+/** Static token chip for the read-only "you receive" side. */
+function TokenChip({ symbol }: { symbol: string }) {
+  return (
+    <span className="flex shrink-0 items-center gap-2 rounded-pill bg-white/8 py-1.5 pl-1.5 pr-3 ring-1 ring-white/12">
+      <TokenIcon symbol={symbol} size={26} />
+      <span className="font-display text-sm font-semibold">{symbol}</span>
+    </span>
+  );
+}
+
+export function WrapPanel() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const isSepolia = chainId === sepolia.id;
   const isMainnet = chainId === mainnet.id;
   const { switchChain, isPending: switchPending } = useSwitchChain();
+  const { openConnectModal } = useConnectModal();
   const { confirm, modal } = useConfirm();
 
   const { validRows: rows } = useRegistryPairs();
@@ -120,28 +135,14 @@ function WrapInner() {
     }
   }, [shield.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!isConnected) {
-    return (
-      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
-        <h2 className="font-semibold">Faucet &amp; Wrap</h2>
-        <p className="mt-3 text-sm text-[#7A8699]">Connect a wallet to claim test tokens and wrap them.</p>
-      </section>
-    );
-  }
-
   if (!pair) {
-    return (
-      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
-        <h2 className="font-semibold">Faucet &amp; Wrap</h2>
-        <p className="mt-3 text-sm text-[#7A8699]">No pairs available on this network.</p>
-      </section>
-    );
+    return <p className="text-sm text-[#7A8699]">No pairs available on this network.</p>;
   }
 
   const needsApproval = allowance.data !== undefined && amountBig > 0n && allowance.data < amountBig;
   const insufficient = balance.data !== undefined && amountBig > 0n && (balance.data as bigint) < amountBig;
   const canWrap = amountBig > 0n && !needsApproval && !insufficient;
-  const balanceFmt = balance.data !== undefined ? formatUnits(balance.data as bigint, decimals) : "—";
+  const balanceFmt = balance.data !== undefined ? formatUnits(balance.data as bigint, decimals) : "-";
 
   // Mainnet writes move real funds — gate them behind an explicit confirm.
   async function doWrap() {
@@ -163,90 +164,81 @@ function WrapInner() {
   }
 
   return (
-    <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
-      <h2 className="font-semibold">Faucet &amp; Wrap</h2>
+    <div className="space-y-3">
       <NetworkBanner />
       {modal}
 
-      {/* Pair selector */}
-      <label className="mt-4 block text-xs uppercase tracking-wider text-[#7A8699]">Pair</label>
-      <select
-        value={pair.confidentialTokenAddress}
-        onChange={(e) => setSelectedConf(e.target.value)}
-        className="mt-1 w-full rounded-lg border border-white/10 bg-[#070A12] px-3 py-2 text-sm"
-      >
-        {rows.map((r) => (
-          <option key={r.confidentialTokenAddress} value={r.confidentialTokenAddress}>
-            {r.underlying.symbol} → {r.confidential.symbol}
-          </option>
-        ))}
-      </select>
+      {/* You wrap (underlying ERC-20) */}
+      <SwapPanel
+        label="You wrap"
+        input={
+          <input
+            inputMode="decimal"
+            placeholder="0.0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full bg-transparent font-display text-2xl tabular-nums outline-none placeholder:text-white/25"
+          />
+        }
+        select={
+          <TokenSelect
+            rows={rows}
+            value={pair.confidentialTokenAddress}
+            onChange={setSelectedConf}
+            variant="underlying"
+          />
+        }
+        footer={
+          <>
+            <span className="text-[#7A8699]">Balance: <span className="tabular-nums text-white/80">{balanceFmt}</span></span>
+            {isSepolia && (
+              <button
+                type="button"
+                disabled={!isConnected || faucet.isPending || faucetReceipt.isLoading || remainingMint === 0n}
+                onClick={() =>
+                  faucet.writeContract({
+                    abi: erc20MintableAbi,
+                    address: pair.erc20Address,
+                    functionName: "mint",
+                    args: [address!, parseUnits(String(FAUCET_AMOUNT), decimals)],
+                  })
+                }
+                className="rounded-md bg-white/8 px-2 py-1 text-xs font-medium ring-1 ring-white/10 hover:bg-white/12 disabled:opacity-50"
+              >
+                {faucet.isPending || faucetReceipt.isLoading
+                  ? "Minting…"
+                  : remainingMint === 0n
+                  ? "Cap reached"
+                  : `Faucet +${FAUCET_AMOUNT}`}
+              </button>
+            )}
+          </>
+        }
+      />
 
-      <div className="mt-3 flex items-center justify-between text-sm">
-        <span className="text-[#7A8699]">{pair.underlying.symbol} balance</span>
-        <span className="tabular-nums">{balanceFmt}</span>
+      {/* Direction arrow */}
+      <div className="flex justify-center">
+        <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/5 ring-1 ring-white/10 text-white/60">↓</span>
       </div>
 
-      {/* Faucet (Sepolia only) */}
-      {isSepolia ? (
-        <>
-          <button
-            type="button"
-            disabled={faucet.isPending || faucetReceipt.isLoading || remainingMint === 0n}
-            onClick={() =>
-              faucet.writeContract({
-                abi: erc20MintableAbi,
-                address: pair.erc20Address,
-                functionName: "mint",
-                args: [address!, parseUnits(String(FAUCET_AMOUNT), decimals)],
-              })
-            }
-            className="mt-3 w-full rounded-lg bg-white/5 px-3 py-2 text-sm font-medium ring-1 ring-white/10 hover:bg-white/10 disabled:opacity-50"
-          >
-            {faucet.isPending || faucetReceipt.isLoading
-              ? "Minting…"
-              : remainingMint === 0n
-              ? `Mint cap reached — no more ${pair.underlying.symbol} available`
-              : `Faucet: mint ${FAUCET_AMOUNT} ${pair.underlying.symbol}`}
-          </button>
-          {remainingMint !== undefined && remainingMint > 0n && (
-            <p className="mt-1 text-xs text-[#7A8699]">
-              Remaining mintable: {formatUnits(remainingMint, decimals)} {pair.underlying.symbol}
-            </p>
-          )}
-        </>
-      ) : isMainnet ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-400/20 bg-amber-400/5 p-3">
-          <p className="text-xs text-amber-200">Faucet is Sepolia-only.</p>
-          <button
-            type="button"
-            disabled={switchPending}
-            onClick={() => switchChain({ chainId: sepolia.id })}
-            className="rounded-md bg-accent-blue px-3 py-1.5 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
-          >
-            {switchPending ? "Switching…" : "Switch to Sepolia"}
-          </button>
-        </div>
-      ) : (
-        <p className="mt-3 text-xs text-[#7A8699]">The faucet is Sepolia-only. Switch to Sepolia to claim test tokens.</p>
-      )}
-      <StatusLine label="Confirming faucet" pending={faucetReceipt.isLoading} error={faucet.error} />
-
-      {/* Amount + wrap */}
-      <label className="mt-5 block text-xs uppercase tracking-wider text-[#7A8699]">Amount to wrap</label>
-      <input
-        inputMode="decimal"
-        placeholder="0.0"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        className="mt-1 w-full rounded-lg border border-white/10 bg-[#070A12] px-3 py-2 text-sm tabular-nums"
+      {/* You receive (confidential ERC-7984, read-only) */}
+      <SwapPanel
+        label="You receive"
+        input={
+          <span className="block font-display text-2xl tabular-nums text-white/80">
+            {amount && Number(amount) > 0 ? amount : "0.0"}
+          </span>
+        }
+        select={<TokenChip symbol={pair.confidential.symbol} />}
+        footer={
+          <span className="text-[#7A8699]">
+            Wrapped 1:1 into {pair.confidential.symbol}; fractions below the wrapper&apos;s precision aren&apos;t minted.
+          </span>
+        }
       />
-      <p className="mt-1 text-xs text-[#7A8699]">
-        Wrapped 1:1 into {pair.confidential.symbol} at the on-chain rate; fractions below the wrapper&apos;s
-        precision aren&apos;t minted.
-      </p>
+
       {isMainnet && (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="text-xs text-[#7A8699]">Tiny test amounts:</span>
           {["0.001", "0.01"].map((v) => (
             <button
@@ -260,19 +252,52 @@ function WrapInner() {
           ))}
         </div>
       )}
+
+      {/* Mainnet faucet notice / switch */}
+      {isMainnet ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/20 bg-amber-400/5 p-3">
+          <p className="text-xs text-amber-200">Faucet is Sepolia-only.</p>
+          <button
+            type="button"
+            disabled={switchPending}
+            onClick={() => switchChain({ chainId: sepolia.id })}
+            className="rounded-md bg-accent-blue px-3 py-1.5 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
+          >
+            {switchPending ? "Switching…" : "Switch to Sepolia"}
+          </button>
+        </div>
+      ) : !isSepolia ? (
+        <p className="text-xs text-[#7A8699]">The faucet is Sepolia-only. Switch to Sepolia to claim test tokens.</p>
+      ) : (
+        remainingMint !== undefined && remainingMint > 0n && (
+          <p className="text-xs text-[#7A8699]">
+            Remaining mintable: {formatUnits(remainingMint, decimals)} {pair.underlying.symbol}
+          </p>
+        )
+      )}
+      <StatusLine label="Confirming faucet" pending={faucetReceipt.isLoading} error={faucet.error} />
+
       {insufficient && (
-        <p className="mt-2 text-xs text-rose-300">
-          Insufficient {pair.underlying.symbol} balance — you have {balanceFmt}.
+        <p className="text-xs text-rose-300">
+          Insufficient {pair.underlying.symbol} balance. You have {balanceFmt}.
           {isSepolia ? " Use the faucet above." : ""}
         </p>
       )}
 
-      {needsApproval ? (
+      {!isConnected ? (
+        <button
+          type="button"
+          onClick={() => openConnectModal?.()}
+          className="w-full rounded-pill bg-accent-blue px-3 py-3 text-sm font-semibold text-accent-blue-foreground shadow-float-blue transition hover:brightness-110"
+        >
+          Connect Wallet
+        </button>
+      ) : needsApproval ? (
         <button
           type="button"
           disabled={approve.isPending}
           onClick={() => approve.mutate({})}
-          className="mt-3 w-full rounded-lg bg-accent-blue px-3 py-2 text-sm font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
+          className="w-full rounded-pill bg-accent-blue px-3 py-3 text-sm font-semibold text-accent-blue-foreground shadow-float-blue transition hover:brightness-110 disabled:opacity-50"
         >
           {approve.isPending ? "Approving…" : `Approve ${pair.underlying.symbol}`}
         </button>
@@ -281,7 +306,7 @@ function WrapInner() {
           type="button"
           disabled={!canWrap || shield.isPending}
           onClick={doWrap}
-          className="mt-3 w-full rounded-lg bg-accent-blue px-3 py-2 text-sm font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
+          className="w-full rounded-pill bg-accent-blue px-3 py-3 text-sm font-semibold text-accent-blue-foreground shadow-float-blue transition hover:brightness-110 disabled:opacity-50"
         >
           {shield.isPending ? "Wrapping…" : "Wrap"}
         </button>
@@ -290,15 +315,15 @@ function WrapInner() {
       <StatusLine label="Wrapping" pending={shield.isPending} error={shield.error} />
 
       {shield.isSuccess && (
-        <p className="mt-3 rounded-lg bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
+        <p className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
           Wrapped. Encrypted {pair.confidential.symbol} balance handle:{" "}
           <span className="font-mono">
             {confidentialBalance.data ? `0x${confidentialBalance.data.toString(16).slice(0, 12)}…` : "updating…"}
           </span>{" "}
-          (decrypt it in M3).
+          (decrypt it in the Decrypt tab).
         </p>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -308,12 +333,7 @@ export function WrapCard() {
   useEffect(() => setReady(true), []);
 
   if (!ready) {
-    return (
-      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
-        <h2 className="font-semibold">Faucet &amp; Wrap</h2>
-        <div className="mt-4 h-24 animate-pulse rounded-lg bg-white/5" />
-      </section>
-    );
+    return <div className="h-24 animate-pulse rounded-lg bg-white/5" />;
   }
-  return <WrapInner />;
+  return <WrapPanel />;
 }

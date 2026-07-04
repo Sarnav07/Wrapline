@@ -59,10 +59,39 @@ function StaticGlobe() {
 const RAIL = [
   { label: "ERC-20", pos: "left-1/2 top-0 -translate-x-1/2" },
   { label: "Zama KMS", pos: "right-6 top-[18%]" },
-  { label: "EIP-712", pos: "right-0 top-1/2 -translate-y-1/2" },
+  { label: "EIP-712", pos: "right-2 top-1/2 -translate-y-1/2" },
   { label: "Relayer", pos: "right-6 bottom-[18%]" },
   { label: "ERC-7984", pos: "left-1/2 bottom-0 -translate-x-1/2" },
 ] as const;
+
+/* Tiny inline chain glyphs for the network toggle — currentColor so they
+ * inherit the button's active/inactive text color, no image asset. */
+function ChainIcon({ network }: { network: Network }) {
+  if (network === "Sepolia") {
+    return (
+      <svg
+        aria-hidden
+        viewBox="0 0 16 16"
+        className="h-3 w-3 shrink-0"
+        fill="currentColor"
+      >
+        <path d="M8 0.5 3 8l5 3 5-3-5-7.5Z" opacity="0.6" />
+        <path d="M8 12.2 3 9.2 8 15.5l5-6.3-5 3Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      className="h-3 w-3 shrink-0"
+      fill="currentColor"
+    >
+      <path d="M8 0 2 8.3 8 11.5l6-3.2L8 0Z" opacity="0.6" />
+      <path d="M8 12.6 2 9.3 8 16l6-6.7-6 3.3Z" />
+    </svg>
+  );
+}
 
 const PILL_CLS =
   "absolute ring-1 ring-white/15 bg-white/5 px-3 py-1 rounded-pill font-mono text-xs text-[#B5D6FF] backdrop-blur-sm";
@@ -125,7 +154,7 @@ export function InfrastructureGlobe() {
           className="relative mx-auto mt-14 h-[520px] max-w-4xl"
         >
           {/* Network toggle — the one interactive overlay. */}
-          <div className="pointer-events-auto absolute left-1/2 top-2 z-30 -translate-x-1/2">
+          <div className="pointer-events-auto absolute left-1/2 top-2 z-40 -translate-x-1/2">
             <div className="inline-flex rounded-pill bg-white/5 p-1 ring-1 ring-white/15 backdrop-blur-sm">
               {(["Sepolia", "Ethereum"] as const).map((n) => (
                 <button
@@ -133,12 +162,13 @@ export function InfrastructureGlobe() {
                   type="button"
                   onClick={() => setNetwork(n)}
                   className={cx(
-                    "rounded-pill px-4 py-1.5 font-mono text-xs transition-colors",
+                    "flex items-center gap-1.5 rounded-pill px-4 py-1.5 font-mono text-xs transition-colors",
                     network === n
                       ? "bg-accent-blue text-accent-blue-foreground"
-                      : "text-[#94A2B8] hover:text-foreground"
+                      : "text-[#B5D6FF] hover:text-foreground"
                   )}
                 >
+                  <ChainIcon network={n} />
                   {n}
                 </button>
               ))}
@@ -146,18 +176,18 @@ export function InfrastructureGlobe() {
           </div>
 
           {/* Globe (or fallbacks). */}
-          <div className="absolute inset-0">
+          <div className="absolute inset-0 z-0">
             {reduced ? <StaticGlobe /> : inView ? <GlobeCanvas /> : <GlobeSkeleton />}
           </div>
 
           {/* Soft glow behind the globe. */}
           <div
             aria-hidden
-            className="pointer-events-none absolute left-1/2 top-1/2 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(0,107,228,0.18),transparent_65%)]"
+            className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(0,107,228,0.18),transparent_65%)]"
           />
 
           {/* Non-interactive overlays. */}
-          <div className="pointer-events-none absolute inset-0">
+          <div className="pointer-events-none absolute inset-0 z-30">
             {/* Orbiting rail pills. */}
             {RAIL.map((r) => (
               <span key={r.label} className={cx(PILL_CLS, r.pos)}>
@@ -165,11 +195,12 @@ export function InfrastructureGlobe() {
               </span>
             ))}
 
-            {/* Flanking flow labels. */}
-            <span className="absolute left-0 top-1/2 -translate-y-1/2 font-mono text-sm text-[#94A2B8]">
+            {/* Flanking flow labels — hidden on mobile, stage has no room
+                for edge labels without overlapping the rail pills/ticket. */}
+            <span className="absolute left-2 top-1/2 hidden -translate-y-1/2 font-mono text-sm text-[#94A2B8] sm:block">
               Plaintext →
             </span>
-            <span className="absolute right-0 bottom-[42%] font-mono text-sm text-[#94A2B8]">
+            <span className="absolute right-2 bottom-[42%] hidden font-mono text-sm text-[#94A2B8] sm:block">
               ← Encrypted
             </span>
 

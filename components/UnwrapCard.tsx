@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAccount, useChainId } from "wagmi";
 import { mainnet } from "wagmi/chains";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { formatUnits, numberToHex, parseUnits, zeroAddress, type Address, type Hex } from "viem";
 import {
   useConfidentialBalance,
@@ -18,6 +19,9 @@ import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
 import { humanizeError } from "@/lib/errors";
 import { useConfirm } from "./ConfirmModal";
 import { NetworkBanner } from "./NetworkBanner";
+import { TokenSelect } from "./app/TokenSelect";
+import { TokenIcon } from "./app/TokenIcon";
+import { SwapPanel } from "./app/SwapPanel";
 
 const storage = indexedDBStorage;
 
@@ -38,6 +42,16 @@ function activeStep(stage: Stage): number {
     default:
       return -1;
   }
+}
+
+/** Static token chip for the read-only "you receive" side. */
+function TokenChip({ symbol }: { symbol: string }) {
+  return (
+    <span className="flex shrink-0 items-center gap-2 rounded-pill bg-white/8 py-1.5 pl-1.5 pr-3 ring-1 ring-white/12">
+      <TokenIcon symbol={symbol} size={26} />
+      <span className="font-display text-sm font-semibold">{symbol}</span>
+    </span>
+  );
 }
 
 function Stepper({ stage }: { stage: Stage }) {
@@ -90,7 +104,7 @@ function ResumeEntry({
   return (
     <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-3">
       <p className="text-xs text-amber-200">
-        Unfinished unwrap of <span className="font-semibold">{symbol}</span> — unwrap tx{" "}
+        Unfinished unwrap of <span className="font-semibold">{symbol}</span>, unwrap tx{" "}
         <span className="font-mono">
           {txHash.slice(0, 8)}…{txHash.slice(-4)}
         </span>{" "}
@@ -129,10 +143,11 @@ function ResumeEntry({
   );
 }
 
-function UnwrapInner() {
+export function UnwrapPanel() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const isMainnet = chainId === mainnet.id;
+  const { openConnectModal } = useConnectModal();
   const { confirm, modal } = useConfirm();
   const { rows, validRows } = useRegistryPairs();
   const [selectedConf, setSelectedConf] = useState<string | null>(null);
@@ -221,15 +236,6 @@ function UnwrapInner() {
   // Reset reveal when the selected token changes.
   useEffect(() => setRevealed(false), [pair?.confidentialTokenAddress]);
 
-  if (!isConnected) {
-    return (
-      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
-        <h2 className="font-semibold">Unwrap</h2>
-        <p className="mt-3 text-sm text-[#7A8699]">Connect a wallet to unwrap back to ERC-20.</p>
-      </section>
-    );
-  }
-
   const wrapper = pair?.confidentialTokenAddress;
   const canUnwrap = Boolean(pair) && amountBig > 0n && stage !== "unwrapping" && stage !== "finalizing" && stage !== "submitted";
 
@@ -275,17 +281,16 @@ function UnwrapInner() {
   }
 
   return (
-    <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
-      <h2 className="font-semibold">Unwrap</h2>
-      <p className="mt-1 text-xs text-[#7A8699]">
-        ERC-7984 → ERC-20. Async: the unwrap is requested on-chain, the KMS publicly decrypts the amount, then
-        the wrapper finalizes. Decrypt your balance in the panel above to see what you can unwrap.
+    <div className="space-y-3">
+      <p className="text-xs text-[#7A8699]">
+        ERC-7984 → ERC-20. Async: the unwrap is requested on-chain, the KMS publicly decrypts the amount, then the
+        wrapper finalizes. Reveal your balance below to see what you can unwrap.
       </p>
       <NetworkBanner />
       {modal}
 
       {pending.length > 0 && (
-        <div className="mt-4 space-y-2">
+        <div className="space-y-2">
           {pending.map((p) => (
             <ResumeEntry key={p.txHash} wrapper={p.wrapper} symbol={p.symbol} txHash={p.txHash} onResolved={rescan} />
           ))}
@@ -293,7 +298,7 @@ function UnwrapInner() {
       )}
 
       {/* Cross-device recovery: seed a tx hash manually so ResumeEntry can finalize it. */}
-      <div className="mt-3">
+      <div>
         <button
           type="button"
           onClick={() => setShowRecovery((s) => !s)}
@@ -302,7 +307,7 @@ function UnwrapInner() {
           {showRecovery ? "Hide recovery" : "Recover unwrap from another device…"}
         </button>
         {showRecovery && (
-          <div className="mt-2 space-y-2 rounded-lg border border-white/10 bg-[#070A12] p-3">
+          <div className="mt-2 space-y-2 rounded-xl border border-white/10 bg-[#070A12] p-3">
             <p className="text-xs text-[#7A8699]">
               Paste your unwrap transaction hash and select the token to resume finalization.
             </p>
@@ -339,54 +344,73 @@ function UnwrapInner() {
 
       {pair && (
         <>
-          <label className="mt-4 block text-xs uppercase tracking-wider text-[#7A8699]">Token</label>
-          <select
-            value={pair.confidentialTokenAddress}
-            onChange={(e) => {
-              setSelectedConf(e.target.value);
-              setStage("idle");
-            }}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-[#070A12] px-3 py-2 text-sm"
-          >
-            {validRows.map((r) => (
-              <option key={r.confidentialTokenAddress} value={r.confidentialTokenAddress}>
-                {r.confidential.symbol} → {r.underlying.symbol}
-              </option>
-            ))}
-          </select>
+          {/* You unwrap (confidential ERC-7984) */}
+          <SwapPanel
+            label="You unwrap"
+            input={
+              <input
+                inputMode="decimal"
+                placeholder="0.0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full bg-transparent font-display text-2xl tabular-nums outline-none placeholder:text-white/25"
+              />
+            }
+            select={
+              <TokenSelect
+                rows={validRows}
+                value={pair.confidentialTokenAddress}
+                onChange={(addr) => {
+                  setSelectedConf(addr);
+                  setStage("idle");
+                }}
+                variant="confidential"
+              />
+            }
+            footer={
+              <>
+                <span className="text-[#7A8699]">{pair.confidential.symbol} balance</span>
+                {confBalance.isLoading ? (
+                  <span className="text-xs text-[#7A8699]">Loading…</span>
+                ) : confBalance.data === 0n ? (
+                  <span className="tabular-nums">0 {pair.confidential.symbol}</span>
+                ) : confBalanceFmt !== null ? (
+                  <span className="tabular-nums text-emerald-300">{confBalanceFmt}</span>
+                ) : handleHex ? (
+                  <button
+                    type="button"
+                    disabled={revealed && decrypt.isFetching}
+                    onClick={() => setRevealed(true)}
+                    className="text-xs text-accent-blue hover:underline disabled:opacity-50"
+                  >
+                    {revealed && decrypt.isFetching ? "Decrypting…" : "Reveal"}
+                  </button>
+                ) : (
+                  <span className="tabular-nums">-</span>
+                )}
+              </>
+            }
+          />
 
-          <div className="mt-3 flex items-center justify-between text-sm">
-            <span className="text-[#7A8699]">{pair.confidential.symbol} balance</span>
-            {confBalance.isLoading ? (
-              <span className="text-xs text-[#7A8699]">Loading…</span>
-            ) : confBalance.data === 0n ? (
-              <span className="tabular-nums">0 {pair.confidential.symbol}</span>
-            ) : confBalanceFmt !== null ? (
-              <span className="tabular-nums text-emerald-300">{confBalanceFmt}</span>
-            ) : handleHex ? (
-              <button
-                type="button"
-                disabled={revealed && decrypt.isFetching}
-                onClick={() => setRevealed(true)}
-                className="text-xs text-accent-blue hover:underline disabled:opacity-50"
-              >
-                {revealed && decrypt.isFetching ? "Decrypting…" : "Reveal"}
-              </button>
-            ) : (
-              <span className="tabular-nums">—</span>
-            )}
+          {/* Direction arrow */}
+          <div className="flex justify-center">
+            <span className="grid h-8 w-8 place-items-center rounded-xl bg-white/5 ring-1 ring-white/10 text-white/60">↓</span>
           </div>
 
-          <label className="mt-4 block text-xs uppercase tracking-wider text-[#7A8699]">Amount to unwrap</label>
-          <input
-            inputMode="decimal"
-            placeholder="0.0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-[#070A12] px-3 py-2 text-sm tabular-nums"
+          {/* You receive (underlying ERC-20, read-only) */}
+          <SwapPanel
+            label="You receive"
+            input={
+              <span className="block font-display text-2xl tabular-nums text-white/80">
+                {amount && Number(amount) > 0 ? amount : "0.0"}
+              </span>
+            }
+            select={<TokenChip symbol={pair.underlying.symbol} />}
+            footer={<span className="text-[#7A8699]">Unwrapped 1:1 back to {pair.underlying.symbol}.</span>}
           />
+
           {isMainnet && (
-            <div className="mt-2 flex items-center gap-2">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-[#7A8699]">Tiny test amounts:</span>
               {["0.001", "0.01"].map((v) => (
                 <button
@@ -401,30 +425,40 @@ function UnwrapInner() {
             </div>
           )}
 
-          <button
-            type="button"
-            disabled={!canUnwrap}
-            onClick={runUnwrap}
-            className="mt-3 w-full rounded-lg bg-accent-blue px-3 py-2 text-sm font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
-          >
-            {stage === "unwrapping" || stage === "finalizing" || stage === "submitted" ? "Unwrapping…" : "Unwrap"}
-          </button>
+          {!isConnected ? (
+            <button
+              type="button"
+              onClick={() => openConnectModal?.()}
+              className="w-full rounded-pill bg-accent-blue px-3 py-3 text-sm font-semibold text-accent-blue-foreground shadow-float-blue transition hover:brightness-110"
+            >
+              Connect Wallet
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={!canUnwrap}
+              onClick={runUnwrap}
+              className="w-full rounded-pill bg-accent-blue px-3 py-3 text-sm font-semibold text-accent-blue-foreground shadow-float-blue transition hover:brightness-110 disabled:opacity-50"
+            >
+              {stage === "unwrapping" || stage === "finalizing" || stage === "submitted" ? "Unwrapping…" : "Unwrap"}
+            </button>
+          )}
 
           <Stepper stage={stage} />
 
           {stage === "done" && (
-            <p className="mt-3 rounded-lg bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
-              Unwrapped. Your {pair.underlying.symbol} balance is back in the wrapped panel.
+            <p className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
+              Unwrapped. Your {pair.underlying.symbol} balance is back in the Wrap tab.
             </p>
           )}
           {stage === "error" && (
-            <p className="mt-3 rounded-lg bg-rose-400/10 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-400/30">
+            <p className="rounded-xl bg-rose-400/10 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-400/30">
               {humanizeError(unshield.error, "Unwrap failed.")} If the unwrap tx already landed, use Resume above.
             </p>
           )}
         </>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -434,12 +468,7 @@ export function UnwrapCard() {
   useEffect(() => setReady(true), []);
 
   if (!ready) {
-    return (
-      <section className="rounded-card border border-white/8 bg-[#0E1424] p-6 shadow-float">
-        <h2 className="font-semibold">Unwrap</h2>
-        <div className="mt-4 h-24 animate-pulse rounded-lg bg-white/5" />
-      </section>
-    );
+    return <div className="h-24 animate-pulse rounded-lg bg-white/5" />;
   }
-  return <UnwrapInner />;
+  return <UnwrapPanel />;
 }

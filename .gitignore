@@ -42,3 +42,7 @@ tsconfig.tsbuildinfo
 /brand/
 /design/
 /frontend-track.md
+
+# reference screenshots + internal audit (not part of the shipped app)
+/Screenshot*.png
+/SUBMISSION_AUDIT.md

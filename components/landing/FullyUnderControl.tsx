@@ -41,7 +41,7 @@ export function FullyUnderControl() {
                 <span className="text-accent-blue">control</span>
               </>
             }
-            subtitle="Reveal, wrap, and audit — on your terms, all from one place."
+            subtitle="Reveal, wrap, and audit on your terms, all from one place."
           />
         </Reveal>
 

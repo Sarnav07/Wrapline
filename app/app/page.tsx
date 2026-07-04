@@ -5,94 +5,64 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId } from "wagmi";
 import { SUPPORTED_NETWORKS } from "@/lib/wagmi";
 import { RegistryTable } from "@/components/RegistryTable";
-import { WrapCard } from "@/components/WrapCard";
-import { UnwrapCard } from "@/components/UnwrapCard";
-import { DecryptCard } from "@/components/DecryptCard";
-import { NetworkBanner } from "@/components/NetworkBanner";
+import { ActionConsole } from "@/components/app/ActionConsole";
+import { OrbField } from "@/components/app/OrbField";
 import { Monogram } from "@/components/landing/Monogram";
 
 export default function Home() {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const chainId = useChainId();
   const network = SUPPORTED_NETWORKS[chainId];
   const supported = Boolean(network);
 
   return (
-    <main className="min-h-screen bg-[#070A12] text-[#EAF0FA] flex flex-col">
-      <header className="flex items-center justify-between px-6 sm:px-10 py-5 border-b border-white/5">
-        <div className="flex items-center gap-3">
+    <main className="relative min-h-screen bg-bg-dark text-foreground">
+      {/* Floating blue orb field + a soft central glow behind the console */}
+      <OrbField />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-24 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(0,107,228,0.16),transparent_65%)]"
+      />
+
+      <header className="relative flex items-center justify-between px-6 py-5 sm:px-10">
+        <Link href="/" className="flex items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-xl ring-1 ring-white/10">
             <Monogram size={22} />
           </span>
-          <div className="leading-tight">
-            <p className="font-semibold tracking-tight text-lg">Wrapline</p>
-            <p className="text-xs text-[#7A8699]">Confidential Wrapper Registry</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-white/50 hover:text-white text-sm">← Back to site</Link>
-          <ConnectButton showBalance={false} chainStatus="full" />
+          <span className="leading-tight">
+            <span className="block font-display text-lg font-bold tracking-tight">Wrapline</span>
+            <span className="block text-xs text-[#7A8699]">Confidential Wrapper Registry</span>
+          </span>
+        </Link>
+        <div className="flex items-center gap-3">
+          {isConnected && (
+            <span className="hidden items-center gap-2 rounded-pill bg-white/5 px-3 py-1.5 text-xs ring-1 ring-white/10 sm:flex">
+              <span className={`h-2 w-2 rounded-full ${supported ? "bg-emerald-400" : "bg-amber-400"}`} />
+              {network ?? `Unsupported (chain ${chainId})`}
+            </span>
+          )}
+          <ConnectButton showBalance={false} chainStatus="icon" />
         </div>
       </header>
 
-      <section className="flex-1 mx-auto w-full max-w-5xl px-6 py-12 sm:py-16">
-        <p className="text-accent-blue text-sm font-semibold tracking-[0.18em] uppercase">
+      <section className="relative mx-auto w-full max-w-md px-5 pt-8 text-center sm:pt-12">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-blue">
           Zama Developer Program
         </p>
-        <h1 className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight">
-          The official Confidential Wrappers Registry, made usable.
+        <h1 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+          Wrap, unwrap, and decrypt confidential tokens.
         </h1>
-        <p className="mt-4 text-[#94A2B8] max-w-2xl">
-          Browse every ERC-20 ↔ ERC-7984 pair on Sepolia and Ethereum mainnet, wrap and
-          unwrap any pair, decrypt balances via EIP-712, and faucet test tokens. Connect a
-          wallet to begin.
-        </p>
+      </section>
 
-        <div className="mt-10 rounded-2xl border border-white/8 bg-[#0E1424] p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold">Connection</h2>
-            <span
-              className={`text-xs rounded-full px-3 py-1 ring-1 ${
-                isConnected
-                  ? "bg-emerald-400/10 text-emerald-300 ring-emerald-400/30"
-                  : "bg-white/5 text-[#94A2B8] ring-white/10"
-              }`}
-            >
-              {isConnected ? "Connected" : "Not connected"}
-            </span>
-          </div>
+      {/* The swap console */}
+      <section className="relative mx-auto w-full max-w-md px-5 pt-8">
+        <ActionConsole />
+      </section>
 
-          <dl className="mt-5 grid gap-3 text-sm">
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-[#7A8699]">Wallet</dt>
-              <dd className="font-mono truncate">
-                {address ? `${address.slice(0, 6)}…${address.slice(-4)}` : "—"}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-[#7A8699]">Network</dt>
-              <dd className="flex items-center gap-2">
-                <span>{network ?? (isConnected ? `Unsupported (chain ${chainId})` : "—")}</span>
-                {isConnected && (
-                  <span
-                    className={`h-2 w-2 rounded-full ${supported ? "bg-emerald-400" : "bg-amber-400"}`}
-                  />
-                )}
-              </dd>
-            </div>
-          </dl>
-
-          <NetworkBanner />
-        </div>
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <RegistryTable />
-          <div className="space-y-6">
-            <WrapCard />
-            <UnwrapCard />
-            <DecryptCard />
-          </div>
-        </div>
+      {/* Registry browser (wide) */}
+      <section className="relative mx-auto mt-14 w-full max-w-5xl px-5 pb-20">
+        <h2 className="mb-4 font-display text-lg font-semibold">Registry</h2>
+        <RegistryTable />
       </section>
     </main>
   );

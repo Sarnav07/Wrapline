@@ -38,7 +38,7 @@ export function Hero() {
         <Reveal delay={180}>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-[#94A2B8]">
             Wrap any ERC-20 into a confidential ERC-7984 token, move shielded
-            balances on-chain, and reveal them only when you choose — powered by
+            balances on-chain, and reveal them only when you choose, powered by
             Zama&apos;s fully homomorphic encryption.
           </p>
         </Reveal>

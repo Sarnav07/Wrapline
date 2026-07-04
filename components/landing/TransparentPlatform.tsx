@@ -1,5 +1,7 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import {
   PillButton,
   GlassCard,
@@ -8,6 +10,13 @@ import {
   AnimatedCounter,
   cx,
 } from "@/components/landing/primitives";
+
+/* Lazily-loaded point-cloud globe (client-only, ssr:false keeps `window`
+ * off the server). Rendered faint + accent-blue as a section backdrop. */
+const GlobeCanvas = dynamic(
+  () => import("./three/GlobeCanvas").then((m) => m.GlobeCanvas),
+  { ssr: false }
+);
 
 /* ------------------------------------------------------------------ *
  * TransparentPlatform — light "transparent token layer" section.
@@ -25,31 +34,82 @@ const CARDS = [
     key: "balance",
     delay: "0s",
     pos: "md:absolute md:left-0 md:top-10 md:w-[300px] md:z-30",
+    anim: "md:animate-float-1",
   },
   {
     key: "wrap",
     delay: "0.8s",
     pos: "md:absolute md:right-2 md:top-0 md:w-[340px] md:z-20",
+    anim: "md:animate-float-2",
   },
   {
     key: "signature",
     delay: "1.6s",
     pos: "md:absolute md:left-[24%] md:bottom-6 md:w-[280px] md:z-40",
+    anim: "md:animate-float-3",
   },
   {
     key: "pairs",
     delay: "2.4s",
     pos: "md:absolute md:right-[6%] md:bottom-2 md:w-[260px] md:z-10",
+    anim: "md:animate-float-4",
   },
 ] as const;
 
 export function TransparentPlatform() {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [inView, setInView] = useState(false);
+  const [reduced, setReduced] = useState(false);
+
+  // Honour prefers-reduced-motion — skip the WebGL backdrop entirely.
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+
+  // Mount the heavy canvas only when the section scrolls into view.
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "200px 0px", threshold: 0.01 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   return (
     <section
+      ref={sectionRef}
       id="platform"
-      className="bg-bg-light text-fg-dark py-24 sm:py-32"
+      className="relative overflow-hidden bg-bg-light text-fg-dark py-24 sm:py-32"
     >
-      <div className="mx-auto max-w-7xl px-5 sm:px-8">
+      {/* Rotating globe backdrop — faint accent-blue on white, edges masked. */}
+      {!reduced && inView && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[720px] w-[720px] -translate-x-1/2 -translate-y-1/2 opacity-70"
+          style={{
+            maskImage:
+              "radial-gradient(circle at center, #000 45%, transparent 72%)",
+            WebkitMaskImage:
+              "radial-gradient(circle at center, #000 45%, transparent 72%)",
+          }}
+        >
+          <GlobeCanvas color="#006be4" opacity={0.5} />
+        </div>
+      )}
+
+      <div className="relative z-10 mx-auto max-w-7xl px-5 sm:px-8">
         <Reveal>
           <SectionHeading
             tone="light"
@@ -67,11 +127,11 @@ export function TransparentPlatform() {
 
         {/* Stage: floating overlapping cards on md+, stacked grid on mobile */}
         <Reveal delay={120} className="mt-14 sm:mt-20">
-          <div className="relative grid gap-4 md:block md:h-[460px]">
-            {CARDS.map(({ key, delay, pos }) => (
+          <div className="relative grid gap-4 md:block md:h-[460px] md:[perspective:1400px]">
+            {CARDS.map(({ key, delay, pos, anim }) => (
               <div
                 key={key}
-                className={cx("md:animate-float", pos)}
+                className={cx(anim, pos)}
                 style={{ animationDelay: delay }}
               >
                 {key === "balance" && <BalanceCard />}

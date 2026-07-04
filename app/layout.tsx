@@ -20,9 +20,9 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Wrapline — Confidential wrapping, without the friction",
+  title: "Wrapline: Confidential wrapping, without the friction",
   description:
-    "Wrap any ERC-20 into a confidential ERC-7984 token, move shielded balances on-chain, and reveal them only when you choose — powered by Zama's FHE protocol.",
+    "Wrap any ERC-20 into a confidential ERC-7984 token, move shielded balances on-chain, and reveal them only when you choose, powered by Zama's FHE protocol.",
 };
 
 export default function RootLayout({

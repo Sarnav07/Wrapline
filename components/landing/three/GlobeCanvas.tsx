@@ -12,7 +12,7 @@ import { fibonacciSphere } from "./particles";
  * import with { ssr: false }).
  * ------------------------------------------------------------------ */
 
-function GlobePoints() {
+function GlobePoints({ color, opacity }: { color: string; opacity: number }) {
   const group = useRef<THREE.Group>(null);
 
   // Build the position buffer once.
@@ -37,11 +37,11 @@ function GlobePoints() {
           />
         </bufferGeometry>
         <pointsMaterial
-          color="#B5D6FF"
+          color={color}
           size={0.02}
           sizeAttenuation
           transparent
-          opacity={0.9}
+          opacity={opacity}
           depthWrite={false}
         />
       </points>
@@ -49,7 +49,13 @@ function GlobePoints() {
   );
 }
 
-export function GlobeCanvas() {
+export function GlobeCanvas({
+  color = "#B5D6FF",
+  opacity = 0.9,
+}: {
+  color?: string;
+  opacity?: number;
+} = {}) {
   return (
     <Canvas
       camera={{ position: [0, 0, 4], fov: 50 }}
@@ -57,7 +63,7 @@ export function GlobeCanvas() {
       gl={{ alpha: true, antialias: true }}
       style={{ background: "transparent" }}
     >
-      <GlobePoints />
+      <GlobePoints color={color} opacity={opacity} />
     </Canvas>
   );
 }
