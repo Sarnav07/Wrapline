@@ -22,12 +22,12 @@ export function SwapPanel({
   return (
     <div
       className={cx(
-        "rounded-2xl border border-white/8 bg-black/25 p-4 transition-colors focus-within:border-white/15",
+        "rounded-2xl border border-white/8 bg-black/25 p-5 transition-colors focus-within:border-white/15",
         className,
       )}
     >
       <p className="text-xs uppercase tracking-wider text-[#7A8699]">{label}</p>
-      <div className="mt-2 flex items-center gap-3">
+      <div className="mt-3 flex items-center gap-3">
         <div className="min-w-0 flex-1">{input}</div>
         <div className="shrink-0">{select}</div>
       </div>

@@ -39,7 +39,7 @@ export function FinalCta() {
               Launch app →
             </PillButton>
             <PillButton
-              href="https://github.com"
+              href="https://github.com/Sarnav07/Wrapline"
               external
               variant="outline"
             >

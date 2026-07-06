@@ -69,37 +69,12 @@ export function TokenSelect({
         onClick={() => setOpen(true)}
         className="flex shrink-0 items-center gap-2 rounded-pill bg-white/8 py-1.5 pl-1.5 pr-3 ring-1 ring-white/12 transition-colors hover:bg-white/12"
       >
-        <TokenIcon
-          symbol={symbolFor(selected, variant)}
-          size={26}
-          popout
-          subLabel={`${selected.underlying.symbol} ↔ ${selected.confidential.symbol}`}
-        />
+        <TokenIcon symbol={symbolFor(selected, variant)} size={26} />
         <span className="font-display text-sm font-semibold">{symbolFor(selected, variant)}</span>
         <svg viewBox="0 0 12 12" className="h-3 w-3 text-white/60" fill="none">
           <path d="M3 4.5 6 7.5 9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
-
-      {/* Hover suggestions — a horizontal coin strip to the left of the trigger */}
-      {!open && rows.length > 1 && (
-        <div className="pointer-events-none absolute right-full top-1/2 z-30 mr-2 flex -translate-y-1/2 origin-right scale-90 items-center gap-1.5 opacity-0 transition-all duration-150 group-hover/select:pointer-events-auto group-hover/select:scale-100 group-hover/select:opacity-100">
-          {rows.slice(0, 5).map((r) => (
-            <button
-              key={r.confidentialTokenAddress}
-              type="button"
-              title={`${r.underlying.symbol} ↔ ${r.confidential.symbol}`}
-              onClick={() => pick(r.confidentialTokenAddress)}
-              className={cx(
-                "grid place-items-center rounded-full p-0.5 ring-1 transition-transform hover:-translate-y-0.5",
-                r.confidentialTokenAddress === value ? "ring-accent-blue" : "ring-white/15",
-              )}
-            >
-              <TokenIcon symbol={symbolFor(r, variant)} size={28} />
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Full modal */}
       {open && (

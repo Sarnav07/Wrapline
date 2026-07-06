@@ -36,11 +36,23 @@ function initials(symbol: string): string {
   return s.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
 }
 
+/** Deterministic brand tint for a symbol. Exported so the background coin
+ * field colors its discs identically to the ones in the card. */
+export function coinTint(symbol: string): string {
+  return tint(symbol);
+}
+
+/** The plain disc (no interaction) — reused at any size, in the card and in
+ * the background coin field. */
+export function CoinDisc({ symbol, size, color, className }: { symbol: string; size: number; color?: string; className?: string }) {
+  return <Disc symbol={symbol} size={size} color={color ?? tint(symbol)} className={className} />;
+}
+
 /** The plain disc (no interaction) — reused at any size. */
-function Disc({ symbol, size, color }: { symbol: string; size: number; color: string }) {
+function Disc({ symbol, size, color, className }: { symbol: string; size: number; color: string; className?: string }) {
   return (
     <span
-      className="grid place-items-center rounded-full font-display font-bold text-white [transform-style:preserve-3d]"
+      className={cx("grid place-items-center rounded-full font-display font-bold text-white [transform-style:preserve-3d]", className)}
       style={{
         width: size,
         height: size,

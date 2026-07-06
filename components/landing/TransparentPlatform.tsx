@@ -147,8 +147,9 @@ export function TransparentPlatform() {
   );
 }
 
-/* 1 — Encrypted balance (light). Masked value + Reveal pill. */
+/* 1 — Encrypted balance (light). Masked value flips to cleartext on Reveal. */
 function BalanceCard() {
+  const [revealed, setRevealed] = useState(false);
   return (
     <GlassCard tone="light" className="p-6">
       <p className="text-text-muted text-xs uppercase tracking-[0.18em]">
@@ -156,13 +157,18 @@ function BalanceCard() {
       </p>
       <div className="mt-3 flex items-center justify-between gap-4">
         <span className="font-mono font-semibold text-fg-dark">cUSDC</span>
-        <span className="font-mono tracking-widest text-2xl text-fg-dark">
-          ••••••
+        <span
+          className={cx(
+            "font-mono text-2xl tabular-nums transition-colors",
+            revealed ? "text-accent-blue" : "tracking-widest text-fg-dark",
+          )}
+        >
+          {revealed ? "100.00" : "••••••"}
         </span>
       </div>
       <div className="mt-5">
-        <PillButton size="sm" variant="primary">
-          Reveal
+        <PillButton size="sm" variant="primary" onClick={() => setRevealed((r) => !r)}>
+          {revealed ? "Hide" : "Reveal"}
         </PillButton>
       </div>
     </GlassCard>

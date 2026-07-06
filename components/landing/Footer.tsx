@@ -41,11 +41,16 @@ export function Footer() {
           <div>
             <h3 className={COL_HEADING}>Resources</h3>
             <div className={COL_LINKS}>
-              <a href="#" className={LINK}>
+              <a
+                href="https://docs.zama.ai"
+                target="_blank"
+                rel="noreferrer"
+                className={LINK}
+              >
                 Docs
               </a>
               <a
-                href="https://github.com"
+                href="https://github.com/Sarnav07/Wrapline"
                 target="_blank"
                 rel="noreferrer"
                 className={LINK}

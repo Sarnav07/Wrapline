@@ -2,12 +2,14 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
+import { mainnet, sepolia } from "wagmi/chains";
 import {
   GlassCard,
   SectionHeading,
   AnimatedCounter,
   cx,
 } from "@/components/landing/primitives";
+import { REGISTRY_ADDRESSES } from "@/config/pairs";
 
 /* ------------------------------------------------------------------ *
  * InfrastructureGlobe — dark "FHE infrastructure" section. A rotating
@@ -98,6 +100,11 @@ const PILL_CLS =
 
 type Network = "Sepolia" | "Ethereum";
 
+/** 0x1234…abcd */
+function shortAddr(a: string): string {
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
 export function InfrastructureGlobe() {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [inView, setInView] = useState(false);
@@ -148,33 +155,34 @@ export function InfrastructureGlobe() {
           subtitle="Plaintext in, encrypted on-chain, decrypted only by you."
         />
 
+        {/* Network toggle — sits above the globe so it never overlaps the
+            orbit rail pills. */}
+        <div className="mt-10 flex justify-center">
+          <div className="inline-flex rounded-pill bg-white/5 p-1 ring-1 ring-white/15 backdrop-blur-sm">
+            {(["Sepolia", "Ethereum"] as const).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setNetwork(n)}
+                className={cx(
+                  "flex items-center gap-1.5 rounded-pill px-4 py-1.5 font-mono text-xs transition-colors",
+                  network === n
+                    ? "bg-accent-blue text-accent-blue-foreground"
+                    : "text-[#B5D6FF] hover:text-foreground"
+                )}
+              >
+                <ChainIcon network={n} />
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Stage */}
         <div
           ref={stageRef}
-          className="relative mx-auto mt-14 h-[520px] max-w-4xl"
+          className="relative mx-auto mt-8 h-[520px] max-w-4xl"
         >
-          {/* Network toggle — the one interactive overlay. */}
-          <div className="pointer-events-auto absolute left-1/2 top-2 z-40 -translate-x-1/2">
-            <div className="inline-flex rounded-pill bg-white/5 p-1 ring-1 ring-white/15 backdrop-blur-sm">
-              {(["Sepolia", "Ethereum"] as const).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setNetwork(n)}
-                  className={cx(
-                    "flex items-center gap-1.5 rounded-pill px-4 py-1.5 font-mono text-xs transition-colors",
-                    network === n
-                      ? "bg-accent-blue text-accent-blue-foreground"
-                      : "text-[#B5D6FF] hover:text-foreground"
-                  )}
-                >
-                  <ChainIcon network={n} />
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Globe (or fallbacks). */}
           <div className="absolute inset-0 z-0">
             {reduced ? <StaticGlobe /> : inView ? <GlobeCanvas /> : <GlobeSkeleton />}
@@ -204,7 +212,7 @@ export function InfrastructureGlobe() {
               ← Encrypted
             </span>
 
-            {/* Center floating ticket chip. */}
+            {/* Center floating ticket chip. Reflects the selected network. */}
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-float">
               <GlassCard tone="glass" className="px-6 py-5 text-center">
                 <p className="font-mono text-xs uppercase tracking-[0.18em] text-text-muted">
@@ -218,6 +226,12 @@ export function InfrastructureGlobe() {
                 />
                 <p className="mt-1 font-mono text-lg tracking-widest text-text-muted">
                   ••••••
+                </p>
+                <p className="mt-3 border-t border-black/10 pt-2 font-mono text-[11px] font-semibold text-fg-dark">
+                  {network === "Sepolia" ? "Sepolia testnet" : "Ethereum Mainnet"}
+                </p>
+                <p className="mt-0.5 font-mono text-[11px] text-text-muted">
+                  {shortAddr(REGISTRY_ADDRESSES[network === "Sepolia" ? sepolia.id : mainnet.id])}
                 </p>
               </GlassCard>
             </div>

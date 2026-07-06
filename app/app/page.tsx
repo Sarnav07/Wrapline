@@ -6,6 +6,7 @@ import { useAccount, useChainId } from "wagmi";
 import { SUPPORTED_NETWORKS } from "@/lib/wagmi";
 import { RegistryTable } from "@/components/RegistryTable";
 import { ActionConsole } from "@/components/app/ActionConsole";
+import { FeatureBento } from "@/components/app/FeatureBento";
 import { OrbField } from "@/components/app/OrbField";
 import { Monogram } from "@/components/landing/Monogram";
 
@@ -46,10 +47,7 @@ export default function Home() {
       </header>
 
       <section className="relative mx-auto w-full max-w-md px-5 pt-8 text-center sm:pt-12">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-blue">
-          Zama Developer Program
-        </p>
-        <h1 className="mt-3 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+        <h1 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
           Wrap, unwrap, and decrypt confidential tokens.
         </h1>
       </section>
@@ -59,8 +57,13 @@ export default function Home() {
         <ActionConsole />
       </section>
 
+      {/* Feature bento (wide) */}
+      <section className="relative mx-auto mt-20 w-full max-w-5xl px-5">
+        <FeatureBento />
+      </section>
+
       {/* Registry browser (wide) */}
-      <section className="relative mx-auto mt-14 w-full max-w-5xl px-5 pb-20">
+      <section id="registry" className="relative mx-auto mt-14 w-full max-w-5xl scroll-mt-24 px-5 pb-20">
         <h2 className="mb-4 font-display text-lg font-semibold">Registry</h2>
         <RegistryTable />
       </section>

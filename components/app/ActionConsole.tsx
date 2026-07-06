@@ -27,7 +27,7 @@ export function ActionConsole() {
   useEffect(() => setReady(true), []);
 
   return (
-    <div className="mx-auto w-full max-w-[460px] animate-fade-up rounded-card border border-white/10 bg-[#0E1424] p-4 shadow-float sm:p-5">
+    <div className="mx-auto w-full max-w-[480px] animate-fade-up rounded-card border border-white/10 bg-[#0E1424] p-5 shadow-float sm:p-6">
       {/* Tab header */}
       <div className="flex gap-1 rounded-pill bg-black/30 p-1 ring-1 ring-white/8">
         {TABS.map((t) => (

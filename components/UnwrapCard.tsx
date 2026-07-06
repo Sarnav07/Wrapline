@@ -353,7 +353,7 @@ export function UnwrapPanel() {
                 placeholder="0.0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-transparent font-display text-2xl tabular-nums outline-none placeholder:text-white/25"
+                className="w-full bg-transparent font-display text-4xl tabular-nums outline-none placeholder:text-white/25 sm:text-5xl"
               />
             }
             select={
@@ -401,7 +401,7 @@ export function UnwrapPanel() {
           <SwapPanel
             label="You receive"
             input={
-              <span className="block font-display text-2xl tabular-nums text-white/80">
+              <span className="block font-display text-4xl tabular-nums text-white/80 sm:text-5xl">
                 {amount && Number(amount) > 0 ? amount : "0.0"}
               </span>
             }
