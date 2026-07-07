@@ -41,7 +41,3 @@ next-env.d.ts
 # typescript incremental cache
 tsconfig.tsbuildinfo
 
-# reference screenshots + internal audit (not part of the shipped app)
-Screenshot*.png
-SUBMISSION_AUDIT.md
-

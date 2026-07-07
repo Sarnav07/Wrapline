@@ -7,7 +7,7 @@
 
 type Loose = { message?: string; shortMessage?: string; cause?: unknown; code?: number | string } | null | undefined;
 
-function collectText(error: unknown, depth = 0): string {
+export function collectText(error: unknown, depth = 0): string {
   if (!error || depth > 4) return "";
   const e = error as Loose;
   const here = [e?.shortMessage, e?.message].filter(Boolean).join(" · ");
@@ -24,14 +24,23 @@ function code(error: unknown): number | string | undefined {
   return undefined;
 }
 
+/** True when the user dismissed the wallet prompt (EIP-1193 4001 / reject text). */
+export function isUserRejection(error: unknown): boolean {
+  const c = code(error);
+  const text = collectText(error).toLowerCase();
+  return (
+    c === 4001 ||
+    /user rejected|user denied|rejected the request|request rejected|denied transaction/.test(text)
+  );
+}
+
 /** Map a thrown error to one clean, user-facing sentence. */
 export function humanizeError(error: unknown, fallback = "Something went wrong. Please try again."): string {
   if (!error) return fallback;
   const text = collectText(error).toLowerCase();
-  const c = code(error);
 
   // User dismissed the wallet prompt — not really an error.
-  if (c === 4001 || /user rejected|user denied|rejected the request|request rejected|denied transaction/.test(text)) {
+  if (isUserRejection(error)) {
     return "You rejected the request in your wallet.";
   }
   // Wallet is on the wrong chain.

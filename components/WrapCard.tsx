@@ -53,7 +53,7 @@ function CopyHex({ value }: { value: `0x${string}` }) {
           /* clipboard unavailable — no-op */
         }
       }}
-      className="inline-flex items-center gap-1 font-mono hover:text-emerald-200"
+      className="inline-flex items-center gap-1 font-mono hover:text-cyan-200"
     >
       <span>{value.slice(0, 14)}…{value.slice(-6)}</span>
       <span className="text-[10px] not-italic">{copied ? "✓ copied" : "⧉ copy"}</span>
@@ -347,7 +347,7 @@ export function WrapPanel() {
       <StatusLine label="Wrapping" pending={shield.isPending} error={shield.error} />
 
       {shield.isSuccess && (
-        <div className="space-y-1 rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
+        <div className="space-y-1 rounded-xl bg-cyan-400/10 px-3 py-2 text-xs text-cyan-300 ring-1 ring-cyan-400/30">
           <p>
             Wrapped. Encrypted {pair.confidential.symbol} balance handle:{" "}
             {confidentialBalance.data ? (
@@ -356,13 +356,13 @@ export function WrapPanel() {
               <span className="font-mono">updating…</span>
             )}
           </p>
-          <p className="text-emerald-300/70">
+          <p className="text-cyan-300/70">
             Decrypt it in the Decrypt tab, or{" "}
             <a
               href={`${explorerBase(chainId)}/address/${pair.confidentialTokenAddress}`}
               target="_blank"
               rel="noreferrer"
-              className="underline underline-offset-2 hover:text-emerald-200"
+              className="underline underline-offset-2 hover:text-cyan-200"
             >
               view the {pair.confidential.symbol} contract
             </a>{" "}

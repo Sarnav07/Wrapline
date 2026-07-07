@@ -9,6 +9,7 @@ import {
   useConfidentialBalance,
   useUnshield,
   useUserDecrypt,
+  useAllow,
   useResumeUnshield,
   indexedDBStorage,
   savePendingUnshield,
@@ -16,7 +17,9 @@ import {
   clearPendingUnshield,
 } from "@zama-fhe/react-sdk";
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
-import { humanizeError } from "@/lib/errors";
+import { collectText, humanizeError, isUserRejection } from "@/lib/errors";
+import { withSignatureLock } from "@/lib/signature-lock";
+import { SignatureHint } from "./SignatureHint";
 import { useConfirm } from "./ConfirmModal";
 import { NetworkBanner } from "./NetworkBanner";
 import { TokenSelect } from "./app/TokenSelect";
@@ -45,7 +48,7 @@ function CopyHex({ value }: { value: `0x${string}` }) {
           /* clipboard unavailable — no-op */
         }
       }}
-      className="inline-flex items-center gap-1 font-mono hover:text-emerald-200"
+      className="inline-flex items-center gap-1 font-mono hover:text-cyan-200"
     >
       <span>{value.slice(0, 14)}…{value.slice(-6)}</span>
       <span className="text-[10px] not-italic">{copied ? "✓ copied" : "⧉ copy"}</span>
@@ -94,12 +97,12 @@ function Stepper({ stage }: { stage: Stage }) {
           <li key={label} className="flex items-center gap-2 text-xs">
             <span
               className={`grid h-4 w-4 place-items-center rounded-full text-[10px] ${
-                done ? "bg-emerald-400 text-[#0B0E14]" : current ? "bg-accent-blue text-accent-blue-foreground" : "bg-white/10 text-[#7A8699]"
+                done ? "bg-cyan-400 text-[#0B0E14]" : current ? "bg-accent-blue text-accent-blue-foreground" : "bg-white/10 text-[#7A8699]"
               }`}
             >
               {done ? "✓" : i + 1}
             </span>
-            <span className={done ? "text-emerald-300" : current ? "text-accent-blue" : "text-[#7A8699]"}>
+            <span className={done ? "text-cyan-300" : current ? "text-accent-blue" : "text-[#7A8699]"}>
               {label}
               {current ? "…" : ""}
             </span>
@@ -218,11 +221,39 @@ export function UnwrapPanel() {
         : undefined,
     [confBalance.data],
   );
+  // Session signature taken once via useAllow (idempotent), never lazily inside
+  // the decrypt query — see DecryptCard for the flood-of-prompts rationale.
+  const allow = useAllow();
   const decrypt = useUserDecrypt(
     { handles: handleHex ? [{ handle: handleHex, contractAddress: pair?.confidentialTokenAddress ?? zeroAddress }] : [] },
-    { enabled: revealed && Boolean(handleHex) },
+    // Only runs after authorization, so creds are cached → this query never
+    // signs, only the relayer/KMS round-trip. Bounded retry rides out flaky KMS;
+    // no focus/reconnect refetch; gcTime:0 so an errored result isn't cached.
+    {
+      enabled: revealed && Boolean(handleHex),
+      retry: (failureCount, err) => failureCount < 2 && !isUserRejection(err),
+      retryDelay: 2000,
+      gcTime: 0,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+    },
   );
   const cleartext = decrypt.data ? Object.values(decrypt.data)[0] : undefined;
+
+  // One click: authorize once (single signature, or no-op if already cached),
+  // then reveal. Failure surfaces via allow.error.
+  const onReveal = async () => {
+    try {
+      if (!pair) return;
+      // Serialized through the global lock: at most one wallet prompt pending
+      // app-wide, so prompts can't stack invisibly inside MetaMask.
+      const token = pair.confidentialTokenAddress;
+      await withSignatureLock(() => allow.mutateAsync([token]));
+      setRevealed(true);
+    } catch {
+      /* shown via allow.isError */
+    }
+  };
   const confBalanceFmt =
     cleartext !== undefined
       ? `${formatUnits(cleartext as bigint, pair?.confidential.decimals ?? 18)} ${pair?.confidential.symbol ?? ""}`
@@ -411,17 +442,38 @@ export function UnwrapPanel() {
                   <span className="tabular-nums">0 {pair.confidential.symbol}</span>
                 ) : !handleHex ? (
                   <span className="tabular-nums">-</span>
+                ) : allow.isError ? (
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-rose-300" title={collectText(allow.error)}>
+                      {humanizeError(allow.error, "Authorization failed")}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={allow.isPending}
+                      onClick={onReveal}
+                      className="text-xs text-accent-blue hover:underline disabled:opacity-50"
+                    >
+                      Retry
+                    </button>
+                  </span>
+                ) : allow.isPending ? (
+                  <span className="block text-right">
+                    <span className="text-xs text-[#7A8699]">Confirm the signature in your wallet…</span>
+                    <SignatureHint active={allow.isPending} />
+                  </span>
                 ) : !revealed ? (
                   <button
                     type="button"
-                    onClick={() => setRevealed(true)}
+                    onClick={onReveal}
                     className="text-xs text-accent-blue hover:underline"
                   >
                     Reveal
                   </button>
                 ) : decrypt.isError ? (
                   <span className="flex items-center gap-2">
-                    <span className="text-xs text-rose-300">{humanizeError(decrypt.error, "Decryption failed")}</span>
+                    <span className="text-xs text-rose-300" title={collectText(decrypt.error)}>
+                      {humanizeError(decrypt.error, "Decryption failed")}
+                    </span>
                     <button
                       type="button"
                       disabled={decrypt.isFetching}
@@ -432,9 +484,9 @@ export function UnwrapPanel() {
                     </button>
                   </span>
                 ) : confBalanceFmt !== null ? (
-                  <span className="tabular-nums text-emerald-300">{confBalanceFmt}</span>
+                  <span className="tabular-nums text-cyan-300">{confBalanceFmt}</span>
                 ) : (
-                  <span className="text-xs text-[#7A8699]">{decrypt.isFetching ? "Decrypting…" : "Awaiting signature…"}</span>
+                  <span className="text-xs text-[#7A8699]">Decrypting…</span>
                 )}
               </>
             }
@@ -495,7 +547,7 @@ export function UnwrapPanel() {
           <Stepper stage={stage} />
 
           {stage === "done" && (
-            <div className="space-y-1 rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
+            <div className="space-y-1 rounded-xl bg-cyan-400/10 px-3 py-2 text-xs text-cyan-300 ring-1 ring-cyan-400/30">
               <p>Unwrapped. Your {pair.underlying.symbol} balance is back in the Wrap tab.</p>
               {finalizeTx && (
                 <p>
@@ -504,19 +556,19 @@ export function UnwrapPanel() {
                     href={`${explorerBase(chainId)}/tx/${finalizeTx}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="underline underline-offset-2 hover:text-emerald-200"
+                    className="underline underline-offset-2 hover:text-cyan-200"
                   >
                     view on Etherscan
                   </a>
                 </p>
               )}
-              <p className="text-emerald-300/70">
+              <p className="text-cyan-300/70">
                 Or check the{" "}
                 <a
                   href={`${explorerBase(chainId)}/address/${pair.erc20Address}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="underline underline-offset-2 hover:text-emerald-200"
+                  className="underline underline-offset-2 hover:text-cyan-200"
                 >
                   {pair.underlying.symbol} contract
                 </a>{" "}
