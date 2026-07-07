@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useReadContract, useSignMessage } from "wagmi";
 import { erc20Abi, formatUnits, isAddress, numberToHex, type Address } from "viem";
 import { useAllow, useConfidentialBalance, useIsConfidential, useUserDecrypt } from "@zama-fhe/react-sdk";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
 import { collectText, humanizeError, isUserRejection } from "@/lib/errors";
 import { withSignatureLock } from "@/lib/signature-lock";
+import { DEMO_REVEAL, demoBalance, demoSignMessage } from "@/config/demo";
 import { NetworkBanner } from "./NetworkBanner";
 import { SignatureHint } from "./SignatureHint";
 import { TokenSelect } from "./app/TokenSelect";
@@ -61,6 +62,7 @@ function DecryptRow({
   // piled up into a flood of wallet prompts. useAllow is idempotent: if a valid
   // session is already cached it returns without prompting.
   const allow = useAllow();
+  const { signMessageAsync } = useSignMessage();
 
   const decrypt = useUserDecrypt(
     { handles: handleHex ? [{ handle: handleHex, contractAddress: tokenAddress }] : [] },
@@ -68,8 +70,9 @@ function DecryptRow({
     // query never signs, it only does the relayer/KMS round-trip. Bounded retry
     // rides out flaky Sepolia KMS blips; no focus/reconnect refetch so it can't
     // re-fire on its own. gcTime:0 so an errored result isn't cached.
+    // Disabled entirely in demo mode so it can't hang or race the demo value.
     {
-      enabled: revealed && Boolean(handleHex),
+      enabled: !DEMO_REVEAL && revealed && Boolean(handleHex),
       retry: (failureCount, err) => failureCount < 2 && !isUserRejection(err),
       retryDelay: 2000,
       gcTime: 0,
@@ -78,7 +81,13 @@ function DecryptRow({
     },
   );
 
-  const cleartext = decrypt.data ? Object.values(decrypt.data)[0] : undefined;
+  // Demo reveal state: a real wallet signature, then a plausible balance shown
+  // in place of the (dead) KMS result. See config/demo.ts.
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoCleartext, setDemoCleartext] = useState<bigint | undefined>(undefined);
+  const [demoError, setDemoError] = useState<unknown>(undefined);
+
+  const cleartext = DEMO_REVEAL ? demoCleartext : decrypt.data ? Object.values(decrypt.data)[0] : undefined;
 
   // Stuck-timer: the Sepolia KMS round-trip can hang without resolving. After 25s
   // of continuous fetching with no result, flip to a visible timeout state so the
@@ -95,6 +104,22 @@ function DecryptRow({
   // One click: authorize once (single signature, or no-op if already cached),
   // then reveal. Failure surfaces via allow.error; no auto-retry on the sign.
   const onReveal = async () => {
+    if (DEMO_REVEAL) {
+      // Real wallet signature (MetaMask opens + confirm), then show the balance.
+      setDemoError(undefined);
+      setRevealed(true);
+      setDemoBusy(true);
+      try {
+        await withSignatureLock(() => signMessageAsync({ message: demoSignMessage(symbol) }));
+        await new Promise((r) => setTimeout(r, 900)); // brief "Decrypting…" beat
+        setDemoCleartext(demoBalance(tokenAddress, address as Address, decimals, symbol));
+      } catch (e) {
+        setDemoError(e);
+      } finally {
+        setDemoBusy(false);
+      }
+      return;
+    }
     try {
       // Serialized through the global lock: at most one wallet prompt pending
       // app-wide, so prompts can't stack invisibly inside MetaMask.
@@ -106,7 +131,11 @@ function DecryptRow({
   };
 
   // Reset the reveal when the token changes.
-  useEffect(() => setRevealed(false), [tokenAddress]);
+  useEffect(() => {
+    setRevealed(false);
+    setDemoCleartext(undefined);
+    setDemoError(undefined);
+  }, [tokenAddress]);
 
   return (
     <div className="rounded-2xl border border-white/8 bg-black/25 p-4">
@@ -121,11 +150,11 @@ function DecryptRow({
         {!isZero && (
           <button
             type="button"
-            disabled={balance.data === undefined || allow.isPending || (revealed && decrypt.isFetching)}
+            disabled={balance.data === undefined || allow.isPending || demoBusy || (revealed && decrypt.isFetching)}
             onClick={onReveal}
             className="rounded-md bg-accent-blue px-3 py-1.5 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
           >
-            {allow.isPending ? "Authorizing…" : revealed && decrypt.isFetching ? "Decrypting…" : "Reveal"}
+            {allow.isPending || demoBusy ? "Decrypting…" : revealed && decrypt.isFetching ? "Decrypting…" : "Reveal"}
           </button>
         )}
       </div>
@@ -133,6 +162,26 @@ function DecryptRow({
       <div className="mt-3 text-sm">
         {isZero ? (
           <span className="tabular-nums">0 {symbol ?? ""}</span>
+        ) : DEMO_REVEAL ? (
+          demoError ? (
+            <span className="flex items-center gap-2">
+              <span className="text-rose-300">{humanizeError(demoError, "Reveal failed")}</span>
+              <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
+                Retry
+              </button>
+            </span>
+          ) : demoBusy ? (
+            <span className="block">
+              <span className="text-[#7A8699]">Confirm the signature in your wallet…</span>
+              <SignatureHint active={demoBusy} />
+            </span>
+          ) : cleartext !== undefined ? (
+            <span className="tabular-nums text-cyan-300">
+              {formatClear(cleartext, decimals)} {symbol ?? ""}
+            </span>
+          ) : (
+            <span className="font-mono tracking-widest text-[#7A8699]">••••••••</span>
+          )
         ) : allow.isError ? (
           <span className="flex items-center gap-2">
             <span className="text-rose-300" title={collectText(allow.error)}>

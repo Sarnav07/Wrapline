@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount, useChainId, useSignMessage } from "wagmi";
 import { mainnet } from "wagmi/chains";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { formatUnits, numberToHex, parseUnits, zeroAddress, type Address, type Hex } from "viem";
@@ -19,6 +19,7 @@ import {
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
 import { collectText, humanizeError, isUserRejection } from "@/lib/errors";
 import { withSignatureLock } from "@/lib/signature-lock";
+import { DEMO_REVEAL, demoBalance, demoSignMessage } from "@/config/demo";
 import { SignatureHint } from "./SignatureHint";
 import { useConfirm } from "./ConfirmModal";
 import { NetworkBanner } from "./NetworkBanner";
@@ -224,13 +225,15 @@ export function UnwrapPanel() {
   // Session signature taken once via useAllow (idempotent), never lazily inside
   // the decrypt query — see DecryptCard for the flood-of-prompts rationale.
   const allow = useAllow();
+  const { signMessageAsync } = useSignMessage();
   const decrypt = useUserDecrypt(
     { handles: handleHex ? [{ handle: handleHex, contractAddress: pair?.confidentialTokenAddress ?? zeroAddress }] : [] },
     // Only runs after authorization, so creds are cached → this query never
     // signs, only the relayer/KMS round-trip. Bounded retry rides out flaky KMS;
     // no focus/reconnect refetch; gcTime:0 so an errored result isn't cached.
+    // Disabled in demo mode so it can't hang or race the demo value.
     {
-      enabled: revealed && Boolean(handleHex),
+      enabled: !DEMO_REVEAL && revealed && Boolean(handleHex),
       retry: (failureCount, err) => failureCount < 2 && !isUserRejection(err),
       retryDelay: 2000,
       gcTime: 0,
@@ -238,13 +241,37 @@ export function UnwrapPanel() {
       refetchOnReconnect: false,
     },
   );
-  const cleartext = decrypt.data ? Object.values(decrypt.data)[0] : undefined;
+
+  // Demo reveal (config/demo.ts): real wallet signature, then a plausible
+  // balance shown in place of the dead KMS result. The unwrap flow is untouched.
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoCleartext, setDemoCleartext] = useState<bigint | undefined>(undefined);
+  const [demoError, setDemoError] = useState<unknown>(undefined);
+
+  const cleartext = DEMO_REVEAL ? demoCleartext : decrypt.data ? Object.values(decrypt.data)[0] : undefined;
 
   // One click: authorize once (single signature, or no-op if already cached),
   // then reveal. Failure surfaces via allow.error.
   const onReveal = async () => {
+    if (!pair) return;
+    if (DEMO_REVEAL) {
+      setDemoError(undefined);
+      setRevealed(true);
+      setDemoBusy(true);
+      try {
+        await withSignatureLock(() => signMessageAsync({ message: demoSignMessage(pair.confidential.symbol) }));
+        await new Promise((r) => setTimeout(r, 900));
+        setDemoCleartext(
+          demoBalance(pair.confidentialTokenAddress, address as Address, pair.confidential.decimals, pair.confidential.symbol),
+        );
+      } catch (e) {
+        setDemoError(e);
+      } finally {
+        setDemoBusy(false);
+      }
+      return;
+    }
     try {
-      if (!pair) return;
       // Serialized through the global lock: at most one wallet prompt pending
       // app-wide, so prompts can't stack invisibly inside MetaMask.
       const token = pair.confidentialTokenAddress;
@@ -306,7 +333,11 @@ export function UnwrapPanel() {
   }, [recoveryConf, pair?.confidentialTokenAddress, validTxHash, recoveryHash, rescan]);
 
   // Reset reveal when the selected token changes.
-  useEffect(() => setRevealed(false), [pair?.confidentialTokenAddress]);
+  useEffect(() => {
+    setRevealed(false);
+    setDemoCleartext(undefined);
+    setDemoError(undefined);
+  }, [pair?.confidentialTokenAddress]);
 
   const wrapper = pair?.confidentialTokenAddress;
   const canUnwrap = Boolean(pair) && amountBig > 0n && stage !== "unwrapping" && stage !== "finalizing" && stage !== "submitted";
@@ -454,6 +485,26 @@ export function UnwrapPanel() {
                   <span className="tabular-nums">0 {pair.confidential.symbol}</span>
                 ) : !handleHex ? (
                   <span className="tabular-nums">-</span>
+                ) : DEMO_REVEAL ? (
+                  demoError ? (
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs text-rose-300">{humanizeError(demoError, "Reveal failed")}</span>
+                      <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
+                        Retry
+                      </button>
+                    </span>
+                  ) : demoBusy ? (
+                    <span className="block text-right">
+                      <span className="text-xs text-[#7A8699]">Confirm the signature in your wallet…</span>
+                      <SignatureHint active={demoBusy} />
+                    </span>
+                  ) : confBalanceFmt !== null ? (
+                    <span className="tabular-nums text-cyan-300">{confBalanceFmt}</span>
+                  ) : (
+                    <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
+                      Reveal
+                    </button>
+                  )
                 ) : allow.isError ? (
                   <span className="flex items-center gap-2">
                     <span className="text-xs text-rose-300" title={collectText(allow.error)}>
