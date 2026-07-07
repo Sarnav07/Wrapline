@@ -1,15 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAccount, useChainId, useSignMessage } from "wagmi";
+import { useAccount, useChainId, useConnectorClient, useReadContract } from "wagmi";
 import { mainnet } from "wagmi/chains";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { formatUnits, numberToHex, parseUnits, zeroAddress, type Address, type Hex } from "viem";
+import { formatUnits, parseUnits, zeroAddress, type Address, type Hex } from "viem";
 import {
-  useConfidentialBalance,
   useUnshield,
-  useUserDecrypt,
-  useAllow,
   useResumeUnshield,
   indexedDBStorage,
   savePendingUnshield,
@@ -17,9 +14,9 @@ import {
   clearPendingUnshield,
 } from "@zama-fhe/react-sdk";
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
-import { collectText, humanizeError, isUserRejection } from "@/lib/errors";
+import { collectText, humanizeError } from "@/lib/errors";
 import { withSignatureLock } from "@/lib/signature-lock";
-import { DEMO_REVEAL, demoBalance, demoSignMessage } from "@/config/demo";
+import { CONFIDENTIAL_BALANCE_ABI, ZERO_HANDLE } from "@/lib/fhe";
 import { SignatureHint } from "./SignatureHint";
 import { useConfirm } from "./ConfirmModal";
 import { NetworkBanner } from "./NetworkBanner";
@@ -209,94 +206,56 @@ export function UnwrapPanel() {
   };
   const unshield = useUnshield(config);
 
-  // Confidential balance display — read the handle, reveal on demand.
-  const [revealed, setRevealed] = useState(false);
-  const confBalance = useConfidentialBalance(
-    { tokenAddress: pair?.confidentialTokenAddress ?? zeroAddress },
-    { enabled: Boolean(pair && address) },
-  );
-  const handleHex = useMemo(
-    () =>
-      confBalance.data !== undefined && confBalance.data !== 0n
-        ? numberToHex(confBalance.data, { size: 32 })
-        : undefined,
-    [confBalance.data],
-  );
-  // Session signature taken once via useAllow (idempotent), never lazily inside
-  // the decrypt query — see DecryptCard for the flood-of-prompts rationale.
-  const allow = useAllow();
-  const { signMessageAsync } = useSignMessage();
-  const decrypt = useUserDecrypt(
-    { handles: handleHex ? [{ handle: handleHex, contractAddress: pair?.confidentialTokenAddress ?? zeroAddress }] : [] },
-    // Only runs after authorization, so creds are cached → this query never
-    // signs, only the relayer/KMS round-trip. Bounded retry rides out flaky KMS;
-    // no focus/reconnect refetch; gcTime:0 so an errored result isn't cached.
-    // Disabled in demo mode so it can't hang or race the demo value.
-    {
-      enabled: !DEMO_REVEAL && revealed && Boolean(handleHex),
-      retry: (failureCount, err) => failureCount < 2 && !isUserRejection(err),
-      retryDelay: 2000,
-      gcTime: 0,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    },
-  );
+  // Confidential balance display — read the handle, reveal on demand via the real
+  // EIP-712 userDecrypt round-trip (lib/fhe.ts). One signature, one round-trip.
+  const { data: connectorClient } = useConnectorClient();
+  // Reveal handle = on-chain ERC-7984 ciphertext handle (bytes32) via confidentialBalanceOf.
+  // NOT useConfidentialBalance, which returns a decoded number userDecrypt rejects.
+  const handleRead = useReadContract({
+    abi: CONFIDENTIAL_BALANCE_ABI,
+    address: pair?.confidentialTokenAddress,
+    functionName: "confidentialBalanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(pair && address) },
+  });
+  const rawHandle = handleRead.data as `0x${string}` | undefined;
+  const handleHex = rawHandle && rawHandle !== ZERO_HANDLE ? rawHandle : undefined;
 
-  // Demo reveal (config/demo.ts): real wallet signature, then a plausible
-  // balance shown in place of the dead KMS result. The unwrap flow is untouched.
-  const [demoBusy, setDemoBusy] = useState(false);
-  const [demoCleartext, setDemoCleartext] = useState<bigint | undefined>(undefined);
-  const [demoError, setDemoError] = useState<unknown>(undefined);
+  const [busy, setBusy] = useState(false);
+  const [cleartext, setCleartext] = useState<bigint | undefined>(undefined);
+  const [revealError, setRevealError] = useState<unknown>(undefined);
 
-  const cleartext = DEMO_REVEAL ? demoCleartext : decrypt.data ? Object.values(decrypt.data)[0] : undefined;
-
-  // One click: authorize once (single signature, or no-op if already cached),
-  // then reveal. Failure surfaces via allow.error.
+  // One click: bridge the wallet connector to an ethers signer, take one EIP-712
+  // signature, run the userDecrypt round-trip. Serialized through the global lock.
   const onReveal = async () => {
-    if (!pair) return;
-    if (DEMO_REVEAL) {
-      setDemoError(undefined);
-      setRevealed(true);
-      setDemoBusy(true);
-      try {
-        await withSignatureLock(() => signMessageAsync({ message: demoSignMessage(pair.confidential.symbol) }));
-        await new Promise((r) => setTimeout(r, 900));
-        setDemoCleartext(
-          demoBalance(pair.confidentialTokenAddress, address as Address, pair.confidential.decimals, pair.confidential.symbol),
-        );
-      } catch (e) {
-        setDemoError(e);
-      } finally {
-        setDemoBusy(false);
-      }
-      return;
-    }
+    if (!pair || !handleHex) return;
+    setRevealError(undefined);
+    setBusy(true);
     try {
-      // Serialized through the global lock: at most one wallet prompt pending
-      // app-wide, so prompts can't stack invisibly inside MetaMask.
-      const token = pair.confidentialTokenAddress;
-      await withSignatureLock(() => allow.mutateAsync([token]));
-      setRevealed(true);
-    } catch {
-      /* shown via allow.isError */
+      const transport = connectorClient?.transport as { request?: unknown } | undefined;
+      if (!transport?.request) throw new Error("Wallet transport unavailable. Reconnect and retry.");
+      const { BrowserProvider } = await import("ethers");
+      const provider = new BrowserProvider(transport as never);
+      const { revealHandle } = await import("@/lib/fhe");
+      const { cleartext: ct } = await withSignatureLock(() =>
+        revealHandle({
+          handle: handleHex,
+          contractAddress: pair.confidentialTokenAddress,
+          provider,
+          chainId,
+        }),
+      );
+      setCleartext(ct);
+    } catch (e) {
+      setRevealError(e);
+    } finally {
+      setBusy(false);
     }
   };
   const confBalanceFmt =
     cleartext !== undefined
-      ? `${formatUnits(cleartext as bigint, pair?.confidential.decimals ?? 18)} ${pair?.confidential.symbol ?? ""}`
+      ? `${formatUnits(cleartext, pair?.confidential.decimals ?? 18)} ${pair?.confidential.symbol ?? ""}`
       : null;
-
-  // Stuck-timer: the Sepolia KMS round-trip can hang. After 25s of continuous
-  // fetching with no result, flip to a timeout state so the row offers Retry
-  // instead of an infinite "Decrypting…".
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    if (!decrypt.isFetching) return;
-    setTimedOut(false);
-    const t = setTimeout(() => setTimedOut(true), 25000);
-    return () => clearTimeout(t);
-  }, [decrypt.isFetching]);
-  const stuck = timedOut && decrypt.isFetching && cleartext === undefined;
 
   // Scan every wrapper on this chain for an interrupted unwrap (resume drawer).
   const [pending, setPending] = useState<{ wrapper: Address; symbol: string; txHash: Hex }[]>([]);
@@ -334,9 +293,8 @@ export function UnwrapPanel() {
 
   // Reset reveal when the selected token changes.
   useEffect(() => {
-    setRevealed(false);
-    setDemoCleartext(undefined);
-    setDemoError(undefined);
+    setCleartext(undefined);
+    setRevealError(undefined);
   }, [pair?.confidentialTokenAddress]);
 
   const wrapper = pair?.confidentialTokenAddress;
@@ -479,93 +437,32 @@ export function UnwrapPanel() {
             footer={
               <>
                 <span className="text-[#7A8699]">{pair.confidential.symbol} balance</span>
-                {confBalance.isLoading ? (
+                {handleRead.isLoading ? (
                   <span className="text-xs text-[#7A8699]">Loading…</span>
-                ) : confBalance.data === 0n ? (
+                ) : rawHandle === ZERO_HANDLE ? (
                   <span className="tabular-nums">0 {pair.confidential.symbol}</span>
                 ) : !handleHex ? (
                   <span className="tabular-nums">-</span>
-                ) : DEMO_REVEAL ? (
-                  demoError ? (
-                    <span className="flex items-center gap-2">
-                      <span className="text-xs text-rose-300">{humanizeError(demoError, "Reveal failed")}</span>
-                      <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
-                        Retry
-                      </button>
-                    </span>
-                  ) : demoBusy ? (
-                    <span className="block text-right">
-                      <span className="text-xs text-[#7A8699]">Confirm the signature in your wallet…</span>
-                      <SignatureHint active={demoBusy} />
-                    </span>
-                  ) : confBalanceFmt !== null ? (
-                    <span className="tabular-nums text-cyan-300">{confBalanceFmt}</span>
-                  ) : (
-                    <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
-                      Reveal
-                    </button>
-                  )
-                ) : allow.isError ? (
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs text-rose-300" title={collectText(allow.error)}>
-                      {humanizeError(allow.error, "Authorization failed")}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={allow.isPending}
-                      onClick={onReveal}
-                      className="text-xs text-accent-blue hover:underline disabled:opacity-50"
-                    >
-                      Retry
-                    </button>
-                  </span>
-                ) : allow.isPending ? (
+                ) : busy ? (
                   <span className="block text-right">
-                    <span className="text-xs text-[#7A8699]">Confirm the signature in your wallet…</span>
-                    <SignatureHint active={allow.isPending} />
+                    <span className="text-xs text-[#7A8699]">Confirm in your wallet, then decrypting…</span>
+                    <SignatureHint active={busy} />
                   </span>
-                ) : !revealed ? (
-                  <button
-                    type="button"
-                    onClick={onReveal}
-                    className="text-xs text-accent-blue hover:underline"
-                  >
-                    Reveal
-                  </button>
-                ) : decrypt.isError ? (
+                ) : revealError ? (
                   <span className="flex items-center gap-2">
-                    <span className="text-xs text-rose-300" title={collectText(decrypt.error)}>
-                      {humanizeError(decrypt.error, "Decryption failed")}
+                    <span className="text-xs text-rose-300" title={collectText(revealError)}>
+                      {humanizeError(revealError, "Decryption failed")}
                     </span>
-                    <button
-                      type="button"
-                      disabled={decrypt.isFetching}
-                      onClick={() => decrypt.refetch()}
-                      className="text-xs text-accent-blue hover:underline disabled:opacity-50"
-                    >
-                      {decrypt.isFetching ? "Retrying…" : "Retry"}
+                    <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
+                      Retry
                     </button>
                   </span>
                 ) : confBalanceFmt !== null ? (
                   <span className="tabular-nums text-cyan-300">{confBalanceFmt}</span>
-                ) : stuck ? (
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs text-rose-300">
-                      Decryption service isn&apos;t responding. Retry.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTimedOut(false);
-                        decrypt.refetch();
-                      }}
-                      className="text-xs text-accent-blue hover:underline"
-                    >
-                      Retry
-                    </button>
-                  </span>
                 ) : (
-                  <span className="text-xs text-[#7A8699]">Decrypting…</span>
+                  <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
+                    Reveal
+                  </button>
                 )}
               </>
             }

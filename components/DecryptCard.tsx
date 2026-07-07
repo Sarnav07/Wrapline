@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useAccount, useReadContract, useSignMessage } from "wagmi";
-import { erc20Abi, formatUnits, isAddress, numberToHex, type Address } from "viem";
-import { useAllow, useConfidentialBalance, useIsConfidential, useUserDecrypt } from "@zama-fhe/react-sdk";
+import { useAccount, useChainId, useConnectorClient, useReadContract } from "wagmi";
+import { erc20Abi, formatUnits, isAddress, type Address } from "viem";
+import { useConfidentialBalance, useIsConfidential } from "@zama-fhe/react-sdk";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useRegistryPairs, type RegistryRow } from "@/lib/registry";
-import { collectText, humanizeError, isUserRejection } from "@/lib/errors";
+import { collectText, humanizeError } from "@/lib/errors";
 import { withSignatureLock } from "@/lib/signature-lock";
-import { DEMO_REVEAL, demoBalance, demoSignMessage } from "@/config/demo";
+import { CONFIDENTIAL_BALANCE_ABI, ZERO_HANDLE } from "@/lib/fhe";
 import { NetworkBanner } from "./NetworkBanner";
 import { SignatureHint } from "./SignatureHint";
 import { TokenSelect } from "./app/TokenSelect";
@@ -21,12 +21,22 @@ function formatClear(value: bigint | boolean | `0x${string}`, decimals: number) 
   return String(value);
 }
 
+/** Friendly message for a failed reveal — ACL denials get a plain-language line. */
+function revealErrorMessage(error: unknown): string {
+  const msg = collectText(error);
+  if (/not authorized|acl|not allowed|user decrypt/i.test(msg)) {
+    return "This wallet isn't authorized to decrypt that token's balance.";
+  }
+  return humanizeError(error, "Decryption failed");
+}
+
 /**
  * One decryptable token. Reads the connected wallet's encrypted balance handle,
- * and only after the user clicks Reveal runs EIP-712 user-decryption. The
- * holder can always decrypt their own balance (ACL granted on mint/transfer), so
- * no explicit allow step is needed here. The first reveal prompts a signature;
- * the SDK caches the session keypair, so later reveals don't re-prompt.
+ * and only after the user clicks Reveal runs the real EIP-712 user-decryption via
+ * `revealHandle` (lib/fhe.ts) — one signature, one relayer/KMS round-trip, no
+ * react-query retry storm. The holder can always decrypt their own balance (ACL
+ * granted on mint/transfer). The relayer SDK caches the session keypair, so later
+ * reveals on the same chain don't re-prompt.
  */
 function DecryptRow({
   tokenAddress,
@@ -38,7 +48,8 @@ function DecryptRow({
   knownDecimals?: number;
 }) {
   const { address } = useAccount();
-  const [revealed, setRevealed] = useState(false);
+  const chainId = useChainId();
+  const { data: connectorClient } = useConnectorClient();
 
   // Fall back to reading decimals on-chain for pasted tokens.
   const decimalsRead = useReadContract({
@@ -49,92 +60,52 @@ function DecryptRow({
   });
   const decimals = knownDecimals ?? decimalsRead.data ?? 0;
 
-  const balance = useConfidentialBalance({ tokenAddress }, { enabled: Boolean(address) });
-  const isZero = balance.data === 0n;
-  const handleHex = useMemo(
-    () => (balance.data !== undefined && balance.data !== 0n ? numberToHex(balance.data, { size: 32 }) : undefined),
-    [balance.data],
-  );
+  // The reveal handle is the on-chain ERC-7984 ciphertext handle (bytes32), read
+  // directly via confidentialBalanceOf — NOT the react-SDK's useConfidentialBalance,
+  // which returns a decoded balance number that userDecrypt rejects ("Unknown FheType").
+  const handleRead = useReadContract({
+    abi: CONFIDENTIAL_BALANCE_ABI,
+    address: tokenAddress,
+    functionName: "confidentialBalanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: Boolean(address) },
+  });
+  const rawHandle = handleRead.data as `0x${string}` | undefined;
+  const isZero = rawHandle === ZERO_HANDLE;
+  const handleHex = rawHandle && rawHandle !== ZERO_HANDLE ? rawHandle : undefined;
 
-  // The EIP-712 session signature is taken ONCE, explicitly, via useAllow — not
-  // lazily inside the decrypt query. Signing inside useUserDecrypt let every
-  // retry / refetch (window-focus, reconnect) fire another signTypedData, which
-  // piled up into a flood of wallet prompts. useAllow is idempotent: if a valid
-  // session is already cached it returns without prompting.
-  const allow = useAllow();
-  const { signMessageAsync } = useSignMessage();
+  const [busy, setBusy] = useState(false);
+  const [cleartext, setCleartext] = useState<bigint | undefined>(undefined);
+  const [error, setError] = useState<unknown>(undefined);
 
-  const decrypt = useUserDecrypt(
-    { handles: handleHex ? [{ handle: handleHex, contractAddress: tokenAddress }] : [] },
-    // Only runs after authorization, so creds are always cached here → this
-    // query never signs, it only does the relayer/KMS round-trip. Bounded retry
-    // rides out flaky Sepolia KMS blips; no focus/reconnect refetch so it can't
-    // re-fire on its own. gcTime:0 so an errored result isn't cached.
-    // Disabled entirely in demo mode so it can't hang or race the demo value.
-    {
-      enabled: !DEMO_REVEAL && revealed && Boolean(handleHex),
-      retry: (failureCount, err) => failureCount < 2 && !isUserRejection(err),
-      retryDelay: 2000,
-      gcTime: 0,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    },
-  );
-
-  // Demo reveal state: a real wallet signature, then a plausible balance shown
-  // in place of the (dead) KMS result. See config/demo.ts.
-  const [demoBusy, setDemoBusy] = useState(false);
-  const [demoCleartext, setDemoCleartext] = useState<bigint | undefined>(undefined);
-  const [demoError, setDemoError] = useState<unknown>(undefined);
-
-  const cleartext = DEMO_REVEAL ? demoCleartext : decrypt.data ? Object.values(decrypt.data)[0] : undefined;
-
-  // Stuck-timer: the Sepolia KMS round-trip can hang without resolving. After 25s
-  // of continuous fetching with no result, flip to a visible timeout state so the
-  // row offers Retry instead of an infinite "Decrypting…".
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    if (!decrypt.isFetching) return;
-    setTimedOut(false);
-    const t = setTimeout(() => setTimedOut(true), 25000);
-    return () => clearTimeout(t);
-  }, [decrypt.isFetching]);
-  const stuck = timedOut && decrypt.isFetching && cleartext === undefined;
-
-  // One click: authorize once (single signature, or no-op if already cached),
-  // then reveal. Failure surfaces via allow.error; no auto-retry on the sign.
+  // One click: bridge the wallet connector to an ethers signer, take one EIP-712
+  // signature, and run the userDecrypt round-trip. Serialized through the global
+  // lock so at most one wallet prompt is pending app-wide.
   const onReveal = async () => {
-    if (DEMO_REVEAL) {
-      // Real wallet signature (MetaMask opens + confirm), then show the balance.
-      setDemoError(undefined);
-      setRevealed(true);
-      setDemoBusy(true);
-      try {
-        await withSignatureLock(() => signMessageAsync({ message: demoSignMessage(symbol) }));
-        await new Promise((r) => setTimeout(r, 900)); // brief "Decrypting…" beat
-        setDemoCleartext(demoBalance(tokenAddress, address as Address, decimals, symbol));
-      } catch (e) {
-        setDemoError(e);
-      } finally {
-        setDemoBusy(false);
-      }
-      return;
-    }
+    if (!handleHex) return;
+    setError(undefined);
+    setBusy(true);
     try {
-      // Serialized through the global lock: at most one wallet prompt pending
-      // app-wide, so prompts can't stack invisibly inside MetaMask.
-      await withSignatureLock(() => allow.mutateAsync([tokenAddress]));
-      setRevealed(true);
-    } catch {
-      /* shown via allow.isError below */
+      const transport = connectorClient?.transport as { request?: unknown } | undefined;
+      if (!transport?.request) throw new Error("Wallet transport unavailable. Reconnect and retry.");
+      const { BrowserProvider } = await import("ethers");
+      const provider = new BrowserProvider(transport as never);
+      const { revealHandle } = await import("@/lib/fhe");
+      const { cleartext: ct } = await withSignatureLock(() =>
+        revealHandle({ handle: handleHex, contractAddress: tokenAddress, provider, chainId }),
+      );
+      setCleartext(ct);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
     }
   };
 
   // Reset the reveal when the token changes.
   useEffect(() => {
-    setRevealed(false);
-    setDemoCleartext(undefined);
-    setDemoError(undefined);
+    setCleartext(undefined);
+    setError(undefined);
   }, [tokenAddress]);
 
   return (
@@ -150,11 +121,11 @@ function DecryptRow({
         {!isZero && (
           <button
             type="button"
-            disabled={balance.data === undefined || allow.isPending || demoBusy || (revealed && decrypt.isFetching)}
+            disabled={handleRead.data === undefined || busy}
             onClick={onReveal}
             className="rounded-md bg-accent-blue px-3 py-1.5 text-xs font-semibold text-accent-blue-foreground hover:brightness-95 disabled:opacity-50"
           >
-            {allow.isPending || demoBusy ? "Decrypting…" : revealed && decrypt.isFetching ? "Decrypting…" : "Reveal"}
+            {busy ? "Decrypting…" : "Reveal"}
           </button>
         )}
       </div>
@@ -162,83 +133,26 @@ function DecryptRow({
       <div className="mt-3 text-sm">
         {isZero ? (
           <span className="tabular-nums">0 {symbol ?? ""}</span>
-        ) : DEMO_REVEAL ? (
-          demoError ? (
-            <span className="flex items-center gap-2">
-              <span className="text-rose-300">{humanizeError(demoError, "Reveal failed")}</span>
-              <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
-                Retry
-              </button>
-            </span>
-          ) : demoBusy ? (
-            <span className="block">
-              <span className="text-[#7A8699]">Confirm the signature in your wallet…</span>
-              <SignatureHint active={demoBusy} />
-            </span>
-          ) : cleartext !== undefined ? (
-            <span className="tabular-nums text-cyan-300">
-              {formatClear(cleartext, decimals)} {symbol ?? ""}
-            </span>
-          ) : (
-            <span className="font-mono tracking-widest text-[#7A8699]">••••••••</span>
-          )
-        ) : allow.isError ? (
-          <span className="flex items-center gap-2">
-            <span className="text-rose-300" title={collectText(allow.error)}>
-              {humanizeError(allow.error, "Authorization failed")}
-            </span>
-            <button
-              type="button"
-              disabled={allow.isPending}
-              onClick={onReveal}
-              className="text-xs text-accent-blue hover:underline disabled:opacity-50"
-            >
-              Retry
-            </button>
-          </span>
-        ) : allow.isPending ? (
+        ) : busy ? (
           <span className="block">
-            <span className="text-[#7A8699]">Confirm the signature in your wallet…</span>
-            <SignatureHint active={allow.isPending} />
+            <span className="text-[#7A8699]">Confirm in your wallet, then decrypting…</span>
+            <SignatureHint active={busy} />
           </span>
-        ) : !revealed ? (
-          <span className="font-mono tracking-widest text-[#7A8699]">••••••••</span>
-        ) : decrypt.isError ? (
+        ) : error ? (
           <span className="flex items-center gap-2">
-            <span className="text-rose-300" title={collectText(decrypt.error)}>
-              {humanizeError(decrypt.error, "Decryption failed")}
+            <span className="text-rose-300" title={collectText(error)}>
+              {revealErrorMessage(error)}
             </span>
-            <button
-              type="button"
-              disabled={decrypt.isFetching}
-              onClick={() => decrypt.refetch()}
-              className="text-xs text-accent-blue hover:underline disabled:opacity-50"
-            >
-              {decrypt.isFetching ? "Retrying…" : "Retry"}
+            <button type="button" onClick={onReveal} className="text-xs text-accent-blue hover:underline">
+              Retry
             </button>
           </span>
         ) : cleartext !== undefined ? (
           <span className="tabular-nums text-cyan-300">
             {formatClear(cleartext, decimals)} {symbol ?? ""}
           </span>
-        ) : stuck ? (
-          <span className="flex items-center gap-2">
-            <span className="text-rose-300">
-              The decryption service isn&apos;t responding on Sepolia. Hit Retry.
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setTimedOut(false);
-                decrypt.refetch();
-              }}
-              className="text-xs text-accent-blue hover:underline"
-            >
-              Retry
-            </button>
-          </span>
         ) : (
-          <span className="text-[#7A8699]">Decrypting…</span>
+          <span className="font-mono tracking-widest text-[#7A8699]">••••••••</span>
         )}
       </div>
     </div>
