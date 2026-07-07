@@ -259,6 +259,18 @@ export function UnwrapPanel() {
       ? `${formatUnits(cleartext as bigint, pair?.confidential.decimals ?? 18)} ${pair?.confidential.symbol ?? ""}`
       : null;
 
+  // Stuck-timer: the Sepolia KMS round-trip can hang. After 25s of continuous
+  // fetching with no result, flip to a timeout state so the row offers Retry
+  // instead of an infinite "Decrypting…".
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    if (!decrypt.isFetching) return;
+    setTimedOut(false);
+    const t = setTimeout(() => setTimedOut(true), 25000);
+    return () => clearTimeout(t);
+  }, [decrypt.isFetching]);
+  const stuck = timedOut && decrypt.isFetching && cleartext === undefined;
+
   // Scan every wrapper on this chain for an interrupted unwrap (resume drawer).
   const [pending, setPending] = useState<{ wrapper: Address; symbol: string; txHash: Hex }[]>([]);
   const [scanTick, setScanTick] = useState(0);
@@ -485,6 +497,22 @@ export function UnwrapPanel() {
                   </span>
                 ) : confBalanceFmt !== null ? (
                   <span className="tabular-nums text-cyan-300">{confBalanceFmt}</span>
+                ) : stuck ? (
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-rose-300">
+                      Decryption service isn&apos;t responding. Retry.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTimedOut(false);
+                        decrypt.refetch();
+                      }}
+                      className="text-xs text-accent-blue hover:underline"
+                    >
+                      Retry
+                    </button>
+                  </span>
                 ) : (
                   <span className="text-xs text-[#7A8699]">Decrypting…</span>
                 )}

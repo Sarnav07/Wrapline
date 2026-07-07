@@ -80,6 +80,18 @@ function DecryptRow({
 
   const cleartext = decrypt.data ? Object.values(decrypt.data)[0] : undefined;
 
+  // Stuck-timer: the Sepolia KMS round-trip can hang without resolving. After 25s
+  // of continuous fetching with no result, flip to a visible timeout state so the
+  // row offers Retry instead of an infinite "Decrypting…".
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    if (!decrypt.isFetching) return;
+    setTimedOut(false);
+    const t = setTimeout(() => setTimedOut(true), 25000);
+    return () => clearTimeout(t);
+  }, [decrypt.isFetching]);
+  const stuck = timedOut && decrypt.isFetching && cleartext === undefined;
+
   // One click: authorize once (single signature, or no-op if already cached),
   // then reveal. Failure surfaces via allow.error; no auto-retry on the sign.
   const onReveal = async () => {
@@ -159,6 +171,22 @@ function DecryptRow({
         ) : cleartext !== undefined ? (
           <span className="tabular-nums text-cyan-300">
             {formatClear(cleartext, decimals)} {symbol ?? ""}
+          </span>
+        ) : stuck ? (
+          <span className="flex items-center gap-2">
+            <span className="text-rose-300">
+              The decryption service isn&apos;t responding on Sepolia. Hit Retry.
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setTimedOut(false);
+                decrypt.refetch();
+              }}
+              className="text-xs text-accent-blue hover:underline"
+            >
+              Retry
+            </button>
           </span>
         ) : (
           <span className="text-[#7A8699]">Decrypting…</span>
