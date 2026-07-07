@@ -27,7 +27,7 @@ export function ActionConsole() {
   useEffect(() => setReady(true), []);
 
   return (
-    <div className="mx-auto w-full max-w-[480px] animate-fade-up rounded-card border border-white/10 bg-[#0E1424] p-5 shadow-float sm:p-6">
+    <div className="mx-auto w-full max-w-[640px] animate-fade-up rounded-card border border-white/10 bg-[#17131E] p-4 shadow-float sm:p-5">
       {/* Tab header */}
       <div className="flex gap-1 rounded-pill bg-black/30 p-1 ring-1 ring-white/8">
         {TABS.map((t) => (
@@ -48,7 +48,7 @@ export function ActionConsole() {
       </div>
 
       {/* Active panel */}
-      <div className="mt-4">
+      <div className="mt-3">
         {!ready ? (
           <div className="h-64 animate-pulse rounded-2xl bg-white/5" />
         ) : tab === "wrap" ? (

@@ -94,8 +94,10 @@ function buildMetadataContracts(pairs: RawPair[], chainId: number) {
   return pairs.flatMap((p) => [
     { abi: erc20Abi, address: p.tokenAddress,             functionName: "symbol"   as const, chainId },
     { abi: erc20Abi, address: p.tokenAddress,             functionName: "decimals" as const, chainId },
+    { abi: erc20Abi, address: p.tokenAddress,             functionName: "name"     as const, chainId },
     { abi: erc20Abi, address: p.confidentialTokenAddress, functionName: "symbol"   as const, chainId },
     { abi: erc20Abi, address: p.confidentialTokenAddress, functionName: "decimals" as const, chainId },
+    { abi: erc20Abi, address: p.confidentialTokenAddress, functionName: "name"     as const, chainId },
   ]);
 }
 
@@ -105,17 +107,20 @@ function zipRows(
   chainId: number,
 ): RegistryRow[] {
   return pairs.map((p, i) => {
-    const base = i * 4;
+    const base = i * 6;
     const underlyingSymbol  = String(meta[base]?.result     ?? "?");
     const underlyingDec     = Number(meta[base + 1]?.result ?? 18);
-    const confSymbol        = String(meta[base + 2]?.result ?? "?");
-    const confDec           = Number(meta[base + 3]?.result ?? 18);
+    // name() is optional on some tokens; fall back to symbol when absent.
+    const underlyingName    = String(meta[base + 2]?.result ?? underlyingSymbol);
+    const confSymbol        = String(meta[base + 3]?.result ?? "?");
+    const confDec           = Number(meta[base + 4]?.result ?? 18);
+    const confName          = String(meta[base + 5]?.result ?? confSymbol);
     return {
       chainId,
       erc20Address:             p.tokenAddress,
       confidentialTokenAddress: p.confidentialTokenAddress,
-      underlying:   { name: underlyingSymbol, symbol: underlyingSymbol, decimals: underlyingDec },
-      confidential: { name: confSymbol,        symbol: confSymbol,       decimals: confDec },
+      underlying:   { name: underlyingName, symbol: underlyingSymbol, decimals: underlyingDec },
+      confidential: { name: confName,       symbol: confSymbol,       decimals: confDec },
       isValid: p.isValid,
       source: "onchain" as const,
     };
@@ -141,8 +146,16 @@ export function useAllChainsPairs() {
     chainId: mainnet.id,
   });
 
-  const sepoliaPairs = (sepoliaReg.data as RawPair[] | undefined) ?? [];
-  const mainnetPairs = (mainnetReg.data as RawPair[] | undefined) ?? [];
+  // Memoize so the array references stay stable across renders — otherwise the
+  // `rows` memo below re-runs on every render and never actually memoizes.
+  const sepoliaPairs = useMemo(
+    () => (sepoliaReg.data as RawPair[] | undefined) ?? [],
+    [sepoliaReg.data],
+  );
+  const mainnetPairs = useMemo(
+    () => (mainnetReg.data as RawPair[] | undefined) ?? [],
+    [mainnetReg.data],
+  );
 
   const sepoliaMeta = useReadContracts({
     contracts: buildMetadataContracts(sepoliaPairs, sepolia.id),

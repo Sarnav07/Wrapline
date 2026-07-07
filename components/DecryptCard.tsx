@@ -91,7 +91,17 @@ function DecryptRow({
         ) : !revealed ? (
           <span className="font-mono tracking-widest text-[#7A8699]">••••••••</span>
         ) : decrypt.isError ? (
-          <span className="text-rose-300">{humanizeError(decrypt.error, "Decryption failed")}</span>
+          <span className="flex items-center gap-2">
+            <span className="text-rose-300">{humanizeError(decrypt.error, "Decryption failed")}</span>
+            <button
+              type="button"
+              disabled={decrypt.isFetching}
+              onClick={() => decrypt.refetch()}
+              className="text-xs text-accent-blue hover:underline disabled:opacity-50"
+            >
+              {decrypt.isFetching ? "Retrying…" : "Retry"}
+            </button>
+          </span>
         ) : cleartext !== undefined ? (
           <span className="tabular-nums text-emerald-300">
             {formatClear(cleartext, decimals)} {symbol ?? ""}
@@ -170,13 +180,17 @@ function DetectRow({ row }: { row: RegistryRow }) {
  * is covered by the paste-an-address fallback below. Gated behind a button so we
  * don't fan out balance reads until the user asks.
  */
-function AutoDetect({ rows }: { rows: RegistryRow[] }) {
+function AutoDetect({ rows, excludeAddress }: { rows: RegistryRow[]; excludeAddress?: Address }) {
   const [scanning, setScanning] = useState(false);
+
+  // The selected registry token already has its own row below — don't list it
+  // twice. Everything else the wallet holds surfaces here.
+  const scanRows = rows.filter((r) => r.confidentialTokenAddress !== excludeAddress);
 
   return (
     <div>
       <div className="flex items-center justify-between">
-        <label className="block text-xs uppercase tracking-wider text-[#7A8699]">Your tokens</label>
+        <label className="block text-xs uppercase tracking-wider text-[#7A8699]">Your other tokens</label>
         <button
           type="button"
           onClick={() => setScanning((s) => !s)}
@@ -187,11 +201,11 @@ function AutoDetect({ rows }: { rows: RegistryRow[] }) {
       </div>
       {scanning && (
         <div className="mt-3 space-y-2">
-          {rows.length === 0 ? (
-            <p className="text-xs text-[#7A8699]">No registry tokens on this network.</p>
+          {scanRows.length === 0 ? (
+            <p className="text-xs text-[#7A8699]">No other registry tokens on this network.</p>
           ) : (
             <>
-              {rows.map((r) => (
+              {scanRows.map((r) => (
                 <DetectRow key={r.confidentialTokenAddress} row={r} />
               ))}
               <p className="text-xs text-[#7A8699]">
@@ -218,7 +232,7 @@ export function DecryptPanel() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <p className="text-xs text-[#7A8699]">
         Reveal your own ERC-7984 balance via EIP-712. The first reveal asks for one signature, then reuses the
         session.
@@ -235,7 +249,7 @@ export function DecryptPanel() {
         </button>
       )}
 
-      <AutoDetect rows={rows} />
+      <AutoDetect rows={rows} excludeAddress={pair?.confidentialTokenAddress} />
 
       {/* Registry token */}
       {pair && (

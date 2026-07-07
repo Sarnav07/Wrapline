@@ -85,7 +85,7 @@ type CardTone = "light" | "dark" | "blue" | "glass";
 
 const CARD_TONES: Record<CardTone, string> = {
   light: "bg-white text-fg-dark ring-1 ring-black/[0.06] shadow-glass-light",
-  dark: "bg-[#0E1424] text-foreground ring-1 ring-white/10 shadow-float",
+  dark: "bg-[#17131E] text-foreground ring-1 ring-white/10 shadow-float",
   blue: "bg-accent-blue text-accent-blue-foreground shadow-float-blue",
   glass:
     "bg-white/70 text-fg-dark ring-1 ring-white/40 backdrop-blur-xl shadow-glass-light",

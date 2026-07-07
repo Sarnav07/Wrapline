@@ -8,6 +8,9 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/playwright/.cache
 
 # next.js
 /.next/
@@ -38,11 +41,7 @@ next-env.d.ts
 # typescript incremental cache
 tsconfig.tsbuildinfo
 
-# bounty: brand assets and internal scratch files, not part of the shipped app
-/brand/
-/design/
-/frontend-track.md
-
 # reference screenshots + internal audit (not part of the shipped app)
-/Screenshot*.png
-/SUBMISSION_AUDIT.md
+Screenshot*.png
+SUBMISSION_AUDIT.md
+

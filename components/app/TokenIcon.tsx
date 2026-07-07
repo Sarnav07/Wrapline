@@ -36,12 +36,6 @@ function initials(symbol: string): string {
   return s.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
 }
 
-/** Deterministic brand tint for a symbol. Exported so the background coin
- * field colors its discs identically to the ones in the card. */
-export function coinTint(symbol: string): string {
-  return tint(symbol);
-}
-
 /** The plain disc (no interaction) — reused at any size, in the card and in
  * the background coin field. */
 export function CoinDisc({ symbol, size, color, className }: { symbol: string; size: number; color?: string; className?: string }) {
@@ -115,7 +109,7 @@ export function TokenIcon({
               <Disc symbol={symbol} size={72} color={color} />
             </span>
           </span>
-          <span className="mt-2 whitespace-nowrap rounded-xl bg-[#0E1424]/90 px-3 py-1.5 text-center ring-1 ring-white/10 backdrop-blur-sm">
+          <span className="mt-2 whitespace-nowrap rounded-xl bg-[#17131E]/90 px-3 py-1.5 text-center ring-1 ring-white/10 backdrop-blur-sm">
             <span className="block font-display text-sm font-semibold text-white">{symbol}</span>
             {subLabel && <span className="block font-mono text-[10px] text-[#7A8699]">{subLabel}</span>}
           </span>

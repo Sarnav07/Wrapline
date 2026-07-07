@@ -55,8 +55,8 @@ export function humanizeError(error: unknown, fallback = "Something went wrong. 
     return "This token isn't a supported ERC-7984 confidential token.";
   }
   // Relayer / KMS round-trip failure (decrypt + unwrap).
-  if (/relayer|gateway|kms|decrypt(ion)? failed|public.?decrypt/.test(text)) {
-    return "The decryption service didn't respond. Wait a moment and retry.";
+  if (/relayer|gateway|kms|decrypt(ion)? failed|failed to (user.?)?decrypt|decrypt(ing)? handles?|public.?decrypt/.test(text)) {
+    return "The decryption service is flaky on Sepolia, this can take a few tries. Wait a moment and hit Retry.";
   }
   // Faucet mint cap hit.
   if (/mint cap|cap exceeded|exceeds.*cap|exceeds.*max.*mint|exceeds.*maximum.*mint|mint.*limit/.test(text)) {

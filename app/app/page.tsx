@@ -8,6 +8,7 @@ import { RegistryTable } from "@/components/RegistryTable";
 import { ActionConsole } from "@/components/app/ActionConsole";
 import { FeatureBento } from "@/components/app/FeatureBento";
 import { OrbField } from "@/components/app/OrbField";
+import { AppFooter } from "@/components/app/AppFooter";
 import { Monogram } from "@/components/landing/Monogram";
 
 export default function Home() {
@@ -22,7 +23,7 @@ export default function Home() {
       <OrbField />
       <div
         aria-hidden
-        className="pointer-events-none absolute left-1/2 top-24 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(0,107,228,0.16),transparent_65%)]"
+        className="pointer-events-none absolute left-1/2 top-24 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(245,55,165,0.16),transparent_65%)]"
       />
 
       <header className="relative flex items-center justify-between px-6 py-5 sm:px-10">
@@ -64,9 +65,10 @@ export default function Home() {
 
       {/* Registry browser (wide) */}
       <section id="registry" className="relative mx-auto mt-14 w-full max-w-5xl scroll-mt-24 px-5 pb-20">
-        <h2 className="mb-4 font-display text-lg font-semibold">Registry</h2>
         <RegistryTable />
       </section>
+
+      <AppFooter />
     </main>
   );
 }

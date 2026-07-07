@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="150" viewBox="0 0 560 150" fill="none" role="img" aria-label="Wrapline — Confidential Wrapper Registry">
+  <!-- panel -->
+  <rect x="1" y="1" width="558" height="148" rx="24" fill="#0b1220" stroke="#1d2740" stroke-width="1"/>
+
+  <!-- monogram tile -->
+  <g transform="translate(40 39)">
+    <rect width="72" height="72" rx="16" fill="#0a0f1c"/>
+    <g transform="translate(4 4) scale(2)">
+      <!-- outer wrapping ribbon -->
+      <path d="M7 9c0-2.2 1.8-4 4-4h10c2.2 0 4 1.8 4 4v3c0 2.2-1.8 4-4 4h-9" fill="none" stroke="#f537a5" stroke-width="2.6" stroke-linecap="round"/>
+      <!-- inner / lower ribbon, offset to read as flow -->
+      <path d="M25 23c0 2.2-1.8 4-4 4H11c-2.2 0-4-1.8-4-4v-3c0-2.2 1.8-4 4-4h9" fill="none" stroke="#f537a5" stroke-width="2.6" stroke-linecap="round" opacity="0.55"/>
+    </g>
+  </g>
+
+  <!-- wordmark + subtitle -->
+  <text x="140" y="70" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="42" font-weight="800" letter-spacing="-1" fill="#f6f9ff">Wrapline</text>
+  <text x="142" y="102" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="17" font-weight="500" letter-spacing="0.3" fill="#94a2b8">Confidential Wrapper Registry</text>
+</svg>

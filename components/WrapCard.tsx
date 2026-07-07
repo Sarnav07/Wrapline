@@ -11,7 +11,7 @@ import {
 } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { formatUnits, parseUnits, zeroAddress } from "viem";
+import { formatUnits, numberToHex, parseUnits, zeroAddress } from "viem";
 import {
   useApproveUnderlying,
   useUnderlyingAllowance,
@@ -31,6 +31,34 @@ function StatusLine({ label, pending, error }: { label: string; pending: boolean
   if (pending) return <p className="mt-2 text-xs text-accent-blue">{label}…</p>;
   if (error) return <p className="mt-2 text-xs text-rose-300">{humanizeError(error)}</p>;
   return null;
+}
+
+function explorerBase(chainId: number) {
+  return chainId === mainnet.id ? "https://etherscan.io" : "https://sepolia.etherscan.io";
+}
+
+/** Copyable truncated hex value (full value copied to clipboard). */
+function CopyHex({ value }: { value: `0x${string}` }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      title="Copy full handle"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          /* clipboard unavailable — no-op */
+        }
+      }}
+      className="inline-flex items-center gap-1 font-mono hover:text-emerald-200"
+    >
+      <span>{value.slice(0, 14)}…{value.slice(-6)}</span>
+      <span className="text-[10px] not-italic">{copied ? "✓ copied" : "⧉ copy"}</span>
+    </button>
+  );
 }
 
 /** Static token chip for the read-only "you receive" side. */
@@ -115,6 +143,10 @@ export function WrapPanel() {
     const rem = (cap.data as bigint) - (minted.data as bigint);
     return rem < 0n ? 0n : rem;
   }, [cap.data, minted.data]);
+  // Block the faucet when the remaining cap can't cover a full claim — a partial
+  // remainder would revert on-chain, so disable rather than let the click fail.
+  const faucetAmountBig = useMemo(() => parseUnits(String(FAUCET_AMOUNT), decimals), [decimals]);
+  const faucetCapBlocked = remainingMint !== undefined && remainingMint < faucetAmountBig;
 
   // Approve + shield via the SDK (config: confidential token doubles as the wrapper).
   const zamaConfig = { tokenAddress: pair?.confidentialTokenAddress ?? zeroAddress, wrapperAddress: pair?.confidentialTokenAddress ?? zeroAddress };
@@ -164,7 +196,7 @@ export function WrapPanel() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <NetworkBanner />
       {modal}
 
@@ -194,7 +226,7 @@ export function WrapPanel() {
             {isSepolia && (
               <button
                 type="button"
-                disabled={!isConnected || faucet.isPending || faucetReceipt.isLoading || remainingMint === 0n}
+                disabled={!isConnected || faucet.isPending || faucetReceipt.isLoading || faucetCapBlocked}
                 onClick={() =>
                   faucet.writeContract({
                     abi: erc20MintableAbi,
@@ -207,7 +239,7 @@ export function WrapPanel() {
               >
                 {faucet.isPending || faucetReceipt.isLoading
                   ? "Minting…"
-                  : remainingMint === 0n
+                  : faucetCapBlocked
                   ? "Cap reached"
                   : `Faucet +${FAUCET_AMOUNT}`}
               </button>
@@ -315,13 +347,28 @@ export function WrapPanel() {
       <StatusLine label="Wrapping" pending={shield.isPending} error={shield.error} />
 
       {shield.isSuccess && (
-        <p className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
-          Wrapped. Encrypted {pair.confidential.symbol} balance handle:{" "}
-          <span className="font-mono">
-            {confidentialBalance.data ? `0x${confidentialBalance.data.toString(16).slice(0, 12)}…` : "updating…"}
-          </span>{" "}
-          (decrypt it in the Decrypt tab).
-        </p>
+        <div className="space-y-1 rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
+          <p>
+            Wrapped. Encrypted {pair.confidential.symbol} balance handle:{" "}
+            {confidentialBalance.data ? (
+              <CopyHex value={numberToHex(confidentialBalance.data, { size: 32 })} />
+            ) : (
+              <span className="font-mono">updating…</span>
+            )}
+          </p>
+          <p className="text-emerald-300/70">
+            Decrypt it in the Decrypt tab, or{" "}
+            <a
+              href={`${explorerBase(chainId)}/address/${pair.confidentialTokenAddress}`}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-2 hover:text-emerald-200"
+            >
+              view the {pair.confidential.symbol} contract
+            </a>{" "}
+            on the explorer.
+          </p>
+        </div>
       )}
     </div>
   );

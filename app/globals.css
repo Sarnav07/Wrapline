@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  /* Fluxo brand palette (faithful) */
-  --accent-blue: #006be4; /* Deep Flow Blue */
+  /* Brand palette — hot magenta-pink accent */
+  --accent-blue: #f537a5; /* Hot Pink (primary accent) */
   --accent-blue-foreground: #ffffff;
-  --accent-sky: #b5d6ff; /* Sky Circuit */
+  --accent-sky: #fbb8e4; /* Soft Pink */
   --bg-dark: #000000; /* Core Black */
   --bg-dark-soft: #070a12; /* near-black, dApp continuity */
   --bg-light: #ffffff;
   --surface-gray: #ececec; /* Light Gray */
   --text-muted: #6b6b6b; /* Dark Gray (on light) */
   --foreground: #eaf0fa; /* on-dark text */
-  --foreground-dark: #0b0e14; /* on-light / on-blue text */
+  --foreground-dark: #0b0e14; /* on-light / on-accent text */
   --gradient-brand: linear-gradient(
     135deg,
-    #003168 0%,
-    #006be4 35%,
-    #6173ff 60%,
-    #b5d6ff 82%,
+    #5c0f45 0%,
+    #f537a5 35%,
+    #ff79cf 60%,
+    #ffc1ec 82%,
     #ffffff 100%
   );
 

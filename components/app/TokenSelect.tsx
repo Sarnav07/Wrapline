@@ -85,7 +85,7 @@ export function TokenSelect({
             onClick={() => setOpen(false)}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
           />
-          <div className="relative w-full max-w-sm overflow-hidden rounded-card border border-white/10 bg-[#0E1424] shadow-float">
+          <div className="relative w-full max-w-sm overflow-hidden rounded-card border border-white/10 bg-[#17131E] shadow-float">
             <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
               <p className="font-display font-semibold">Select a token</p>
               <button
@@ -103,7 +103,7 @@ export function TokenSelect({
                 placeholder="Search name or paste address"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#070A12] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent-blue/60"
+                className="w-full rounded-xl border border-white/10 bg-[#0E0B13] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-accent-blue/60"
               />
             </div>
             <div className="max-h-72 overflow-y-auto px-2 pb-2">

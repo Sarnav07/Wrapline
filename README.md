@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/wrapline-logo.svg" alt="Wrapline — Confidential Wrapper Registry" width="480" />
+</p>
+
 # Wrapline — Confidential Wrapper Registry
 
 > The official **Zama Wrappers Registry**, turned into a usable product. Browse every
@@ -8,6 +12,8 @@
 - **Live app:** https://wrapline.vercel.app/
 - **Networks:** Ethereum Sepolia (testnet) · Ethereum Mainnet
 - **Built for:** Zama Developer Program — Season 3, Bounty Track
+
+**Jump to:** [Registry sourcing](#hybrid-registry-sourcing) · [Add a new pair](#registering-a-new-pair-on-chain) · [Deployment & scripts](#deployment) · [Contract addresses](#registry--contract-addresses)
 
 ---
 
@@ -423,6 +429,18 @@ pnpm start    # serve the production build
 pnpm lint     # eslint
 ```
 
+### Deployment
+
+The app is a standard Next.js 14 app and deploys on **Vercel** with zero extra config —
+`pnpm build` is the build command, no server runtime is required (both routes are static).
+The three environment variables above are **all optional**: injected wallets and public RPC
+fallbacks make the deployment work even with none set. Set them in the Vercel project only to
+enable WalletConnect (`NEXT_PUBLIC_WC_PROJECT_ID`) and custom RPCs.
+
+The only ops script is [`scripts/register-pair.sh`](./scripts/register-pair.sh) — a Foundry
+(`cast`) helper that registers a new ERC-20 ↔ ERC-7984 pair on the on-chain Wrappers Registry
+(see below). There is no separate deploy script; the frontend deploy is the Vercel build.
+
 ### Registering a new pair on-chain
 
 `scripts/register-pair.sh` calls `registerConfidentialToken(address,address)` on the deployed
@@ -494,8 +512,7 @@ Manual QA checklist (connect a wallet on **Sepolia**):
 ## Development Team
 
 - [@Sarnav07](https://github.com/Sarnav07)
-
-*(More contributors to be added.)*
+- [@vihaan1016](https://github.com/vihaan1016)
 
 ---
 

@@ -39,8 +39,8 @@ const config: Config = {
       },
       boxShadow: {
         float: "0 24px 60px -20px rgba(0, 0, 0, 0.25)",
-        "float-blue": "0 24px 60px -20px rgba(0, 107, 228, 0.35)",
-        "glass-light": "0 12px 40px -12px rgba(0, 49, 104, 0.18)",
+        "float-blue": "0 24px 60px -20px rgba(245, 55, 165, 0.35)",
+        "glass-light": "0 12px 40px -12px rgba(150, 20, 90, 0.18)",
       },
       backgroundImage: {
         "gradient-brand": "var(--gradient-brand)",

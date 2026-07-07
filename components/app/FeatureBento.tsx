@@ -23,7 +23,7 @@ import { useAllChainsPairs } from "@/lib/registry";
 
 const GlobeSkeleton = () => (
   <div className="absolute inset-0 grid place-items-center">
-    <div className="h-40 w-40 animate-pulse rounded-full bg-[radial-gradient(circle,rgba(97,115,255,0.16),transparent_70%)]" />
+    <div className="h-40 w-40 animate-pulse rounded-full bg-[radial-gradient(circle,rgba(255,121,207,0.16),transparent_70%)]" />
   </div>
 );
 
@@ -53,7 +53,7 @@ function StaticGlobe() {
       <div
         className="h-40 w-40 rounded-full opacity-70"
         style={{
-          backgroundImage: "radial-gradient(rgba(97,115,255,0.6) 1px, transparent 1.4px)",
+          backgroundImage: "radial-gradient(rgba(255,121,207,0.6) 1px, transparent 1.4px)",
           backgroundSize: "12px 12px",
           maskImage: "radial-gradient(circle at center, #000 55%, transparent 72%)",
           WebkitMaskImage: "radial-gradient(circle at center, #000 55%, transparent 72%)",
@@ -103,10 +103,10 @@ export function FeatureBento() {
         <Reveal>
           <GlassCard
             tone="dark"
-            className={cx(tileBase, "bg-[radial-gradient(120%_120%_at_0%_0%,rgba(0,107,228,0.16),transparent_55%)]")}
+            className={cx(tileBase, "bg-[radial-gradient(120%_120%_at_0%_0%,rgba(245,55,165,0.16),transparent_55%)]")}
           >
-            <Eyebrow color="#3b93ff" label="Confidential" />
-            <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-[#8fc0ff]">
+            <Eyebrow color="#f75fb5" label="Confidential" />
+            <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-[#ffa8dc]">
               Encrypted by default.
             </h3>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-[#94A2B8]">
@@ -199,7 +199,7 @@ export function FeatureBento() {
         <Reveal delay={160}>
           <GlassCard
             tone="dark"
-            className={cx(tileBase, "bg-[radial-gradient(120%_120%_at_100%_100%,rgba(97,115,255,0.18),transparent_55%)]")}
+            className={cx(tileBase, "bg-[radial-gradient(120%_120%_at_100%_100%,rgba(255,121,207,0.18),transparent_55%)]")}
           >
             <Eyebrow color="#818cf8" label="Dual-chain" />
             <h3 className="mt-4 font-display text-2xl font-bold tracking-tight text-[#c7b3ff]">

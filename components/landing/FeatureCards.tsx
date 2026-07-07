@@ -105,7 +105,7 @@ export function FeatureCards() {
                   <div className="absolute inset-10 rounded-full border border-accent-blue/30" />
                   {/* Centered monogram core. */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0E1424] ring-1 ring-white/15 shadow-float-blue">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[#17131E] ring-1 ring-white/15 shadow-float-blue">
                       <Monogram size={40} />
                     </span>
                   </div>

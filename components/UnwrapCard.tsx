@@ -25,6 +25,34 @@ import { SwapPanel } from "./app/SwapPanel";
 
 const storage = indexedDBStorage;
 
+function explorerBase(chainId: number) {
+  return chainId === mainnet.id ? "https://etherscan.io" : "https://sepolia.etherscan.io";
+}
+
+/** Copyable truncated hex value (full value copied to clipboard). */
+function CopyHex({ value }: { value: `0x${string}` }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      title="Copy full value"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          /* clipboard unavailable — no-op */
+        }
+      }}
+      className="inline-flex items-center gap-1 font-mono hover:text-emerald-200"
+    >
+      <span>{value.slice(0, 14)}…{value.slice(-6)}</span>
+      <span className="text-[10px] not-italic">{copied ? "✓ copied" : "⧉ copy"}</span>
+    </button>
+  );
+}
+
 type Stage = "idle" | "unwrapping" | "finalizing" | "submitted" | "done" | "error";
 
 const STEP_LABELS = ["Unwrap request", "KMS public-decrypt", "Finalize"] as const;
@@ -159,6 +187,7 @@ export function UnwrapPanel() {
 
   const [amount, setAmount] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
+  const [finalizeTx, setFinalizeTx] = useState<Hex | undefined>(undefined);
 
   const decimals = pair?.confidential.decimals ?? 6;
   const amountBig = useMemo(() => {
@@ -256,6 +285,7 @@ export function UnwrapPanel() {
       if (!ok) return;
     }
     setStage("unwrapping");
+    setFinalizeTx(undefined);
     unshield.mutate(
       {
         amount: amountBig,
@@ -266,11 +296,16 @@ export function UnwrapPanel() {
           rescan();
         },
         onFinalizing: () => setStage("finalizing"),
-        onFinalizeSubmitted: () => setStage("submitted"),
+        onFinalizeSubmitted: (txHash) => {
+          setFinalizeTx(txHash);
+          setStage("submitted");
+        },
       },
       {
-        onSuccess: async () => {
+        onSuccess: async (result) => {
           await clearPendingUnshield(storage, wrapper);
+          // Fall back to the mined tx hash if the submitted callback didn't fire.
+          setFinalizeTx((prev) => prev ?? result.txHash);
           setStage("done");
           setAmount("");
           rescan();
@@ -281,7 +316,7 @@ export function UnwrapPanel() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <p className="text-xs text-[#7A8699]">
         ERC-7984 → ERC-20. Async: the unwrap is requested on-chain, the KMS publicly decrypts the amount, then the
         wrapper finalizes. Reveal your balance below to see what you can unwrap.
@@ -307,14 +342,14 @@ export function UnwrapPanel() {
           {showRecovery ? "Hide recovery" : "Recover unwrap from another device…"}
         </button>
         {showRecovery && (
-          <div className="mt-2 space-y-2 rounded-xl border border-white/10 bg-[#070A12] p-3">
+          <div className="mt-2 space-y-2 rounded-xl border border-white/10 bg-[#0E0B13] p-3">
             <p className="text-xs text-[#7A8699]">
               Paste your unwrap transaction hash and select the token to resume finalization.
             </p>
             <select
               value={recoveryConf}
               onChange={(e) => setRecoveryConf(e.target.value)}
-              className="w-full rounded-lg border border-white/10 bg-[#0E1424] px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-white/10 bg-[#17131E] px-3 py-2 text-sm"
             >
               <option value="">Select token…</option>
               {validRows.map((r) => (
@@ -328,7 +363,7 @@ export function UnwrapPanel() {
               placeholder="0x… (66-char tx hash)"
               value={recoveryHash}
               onChange={(e) => setRecoveryHash(e.target.value.trim())}
-              className="w-full rounded-lg border border-white/10 bg-[#0E1424] px-3 py-2 font-mono text-xs"
+              className="w-full rounded-lg border border-white/10 bg-[#17131E] px-3 py-2 font-mono text-xs"
             />
             <button
               type="button"
@@ -374,19 +409,32 @@ export function UnwrapPanel() {
                   <span className="text-xs text-[#7A8699]">Loading…</span>
                 ) : confBalance.data === 0n ? (
                   <span className="tabular-nums">0 {pair.confidential.symbol}</span>
-                ) : confBalanceFmt !== null ? (
-                  <span className="tabular-nums text-emerald-300">{confBalanceFmt}</span>
-                ) : handleHex ? (
+                ) : !handleHex ? (
+                  <span className="tabular-nums">-</span>
+                ) : !revealed ? (
                   <button
                     type="button"
-                    disabled={revealed && decrypt.isFetching}
                     onClick={() => setRevealed(true)}
-                    className="text-xs text-accent-blue hover:underline disabled:opacity-50"
+                    className="text-xs text-accent-blue hover:underline"
                   >
-                    {revealed && decrypt.isFetching ? "Decrypting…" : "Reveal"}
+                    Reveal
                   </button>
+                ) : decrypt.isError ? (
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-rose-300">{humanizeError(decrypt.error, "Decryption failed")}</span>
+                    <button
+                      type="button"
+                      disabled={decrypt.isFetching}
+                      onClick={() => decrypt.refetch()}
+                      className="text-xs text-accent-blue hover:underline disabled:opacity-50"
+                    >
+                      {decrypt.isFetching ? "Retrying…" : "Retry"}
+                    </button>
+                  </span>
+                ) : confBalanceFmt !== null ? (
+                  <span className="tabular-nums text-emerald-300">{confBalanceFmt}</span>
                 ) : (
-                  <span className="tabular-nums">-</span>
+                  <span className="text-xs text-[#7A8699]">{decrypt.isFetching ? "Decrypting…" : "Awaiting signature…"}</span>
                 )}
               </>
             }
@@ -447,9 +495,34 @@ export function UnwrapPanel() {
           <Stepper stage={stage} />
 
           {stage === "done" && (
-            <p className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
-              Unwrapped. Your {pair.underlying.symbol} balance is back in the Wrap tab.
-            </p>
+            <div className="space-y-1 rounded-xl bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
+              <p>Unwrapped. Your {pair.underlying.symbol} balance is back in the Wrap tab.</p>
+              {finalizeTx && (
+                <p>
+                  Finalize tx: <CopyHex value={finalizeTx} />{" "}
+                  <a
+                    href={`${explorerBase(chainId)}/tx/${finalizeTx}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2 hover:text-emerald-200"
+                  >
+                    view on Etherscan
+                  </a>
+                </p>
+              )}
+              <p className="text-emerald-300/70">
+                Or check the{" "}
+                <a
+                  href={`${explorerBase(chainId)}/address/${pair.erc20Address}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2 hover:text-emerald-200"
+                >
+                  {pair.underlying.symbol} contract
+                </a>{" "}
+                — your ERC-20 balance rose by the unwrapped amount.
+              </p>
+            </div>
           )}
           {stage === "error" && (
             <p className="rounded-xl bg-rose-400/10 px-3 py-2 text-xs text-rose-200 ring-1 ring-rose-400/30">

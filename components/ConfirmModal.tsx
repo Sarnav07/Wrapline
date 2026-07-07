@@ -42,7 +42,7 @@ export function useConfirm() {
       aria-modal="true"
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0E1424] p-6 shadow-xl"
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#17131E] p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-base font-semibold">{pending.title}</h3>
