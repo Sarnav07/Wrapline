@@ -509,13 +509,6 @@ Manual QA checklist (connect a wallet on **Sepolia**):
 
 ---
 
-## Development Team
-
-- [@Sarnav07](https://github.com/Sarnav07)
-- [@vihaan1016](https://github.com/vihaan1016)
-
----
-
 ## License
 
 MIT.
